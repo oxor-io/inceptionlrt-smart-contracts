@@ -11,9 +11,10 @@ const deployVault = async (addresses, vaultName, tokenName, tokenSymbol) => {
   // 1. Inception token
   const iTokenFactory = await hre.ethers.getContractFactory("InceptionToken");
   const iToken = await upgrades.deployProxy(iTokenFactory, [tokenName, tokenSymbol]);
-  await iToken.waitForDeployment();
+  await iToken.deployed();
+  //await iToken.waitForDeployment();
 
-  const iTokenAddress = await iToken.getAddress();
+  const iTokenAddress = iToken.address;
   console.log(`InceptionToken address: ${iTokenAddress}`);
   const iTokenImplAddress = await upgrades.erc1967.getImplementationAddress(iTokenAddress);
 
@@ -56,12 +57,14 @@ const deployVault = async (addresses, vaultName, tokenName, tokenSymbol) => {
     iTokenAddress,
     strategyAddress,
   ]);
+  await iVault.deployed();
+  // await iVault.waitForDeployment();
 
-  await iVault.waitForDeployment();
-
-  const iVaultAddress = await iVault.getAddress();
+  const iVaultAddress = await iVault.address;
   console.log(`InceptionVault address: ${iVaultAddress}`);
   const iVaultImplAddress = await upgrades.erc1967.getImplementationAddress(iVaultAddress);
+
+  console.log("Admin: ", await upgrades.erc1967.getAdminAddress(iVaultAddress));
 
   // 3. set the vault
   tx = await iToken.setVault(iVaultAddress);
