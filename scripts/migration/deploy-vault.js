@@ -11,11 +11,10 @@ const deployVault = async (addresses, vaultName, tokenName, tokenSymbol) => {
   // 1. Inception token
   const iTokenFactory = await hre.ethers.getContractFactory("InceptionToken");
   const iToken = await upgrades.deployProxy(iTokenFactory, [tokenName, tokenSymbol]);
-  await iToken.waitForDeployment();
+  await iToken.deployed();
 
-  const iTokenAddress = await iToken.getAddress();
+  const iTokenAddress = iToken.address;
   console.log(`InceptionToken address: ${iTokenAddress}`);
-  const iTokenImplAddress = await upgrades.erc1967.getImplementationAddress(iTokenAddress);
 
   let strategyAddress;
   let vaultFactory = "InVault_E1";
@@ -42,8 +41,10 @@ const deployVault = async (addresses, vaultName, tokenName, tokenSymbol) => {
       break;
     case "IncbEthVault":
       strategyAddress = addresses.CoinbaseStrategy;
+      break;
     case "InswEthVault":
       strategyAddress = addresses.SwellStrategy;
+      break;
     case "InEthxVault":
       strategyAddress = addresses.StaderStrategy;
       break;
@@ -60,12 +61,10 @@ const deployVault = async (addresses, vaultName, tokenName, tokenSymbol) => {
     iTokenAddress,
     strategyAddress,
   ]);
+  await iVault.deployed();
 
-  await iVault.waitForDeployment();
-
-  const iVaultAddress = await iVault.getAddress();
+  const iVaultAddress = iVault.address;
   console.log(`InceptionVault address: ${iVaultAddress}`);
-  const iVaultImplAddress = await upgrades.erc1967.getImplementationAddress(iVaultAddress);
 
   // 3. set the vault
   tx = await iToken.setVault(iVaultAddress);
@@ -78,9 +77,7 @@ const deployVault = async (addresses, vaultName, tokenName, tokenSymbol) => {
   // 4. save addresses localy
   const iAddresses = {
     iVaultAddress: iVaultAddress,
-    iVaultImpl: iVaultImplAddress,
     iTokenAddress: iTokenAddress,
-    iTokenImpl: iTokenImplAddress,
   };
 
   const json_addresses = JSON.stringify(iAddresses);
