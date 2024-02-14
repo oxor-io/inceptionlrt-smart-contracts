@@ -1,0 +1,9 @@
+{
+  "tokenName": "XXX",
+  "tokenSymbol": "XXX",
+  "bridgeDetails": {
+    "bridge": "XXX",
+    "burnLimit": 100e18,
+    "mintLimit": 100e18
+  }
+}

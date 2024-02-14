@@ -2,14 +2,16 @@ require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
 
+require("./tasks/deploy-xerc20");
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   networks: {
     hardhat: {
       forking: {
         url: `${process.env.RPC_URL_ETHEREUM}`,
-        blockNumber: 18923449
-      }
+        blockNumber: 18923449,
+      },
     },
     localhost: {
       url: "http://127.0.0.1:8545/",
@@ -20,6 +22,12 @@ module.exports = {
       chainId: 1,
       gas: 8000000,
     },
+    arbitrum: {
+      accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`],
+      url: `${process.env.RPC_URL_ARBITRUM}`,
+      chainId: 42161,
+      gas: 8000000,
+    },
   },
   solidity: {
     compilers: [
@@ -28,10 +36,10 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200
-          }
-        }
-      }
-    ]
-  }
+            runs: 200,
+          },
+        },
+      },
+    ],
+  },
 };
