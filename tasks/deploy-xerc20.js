@@ -4,7 +4,7 @@ const path = require("path");
 const configTemplate = require("./deploy_template.json");
 const addressesPath = "./scripts/migration/addresses";
 
-const factoryAddress = "0x7673F15B0492A681CE57Db82b81E00D6b7797A11";
+const factoryAddress = "0xb913bE186110B1119d5B9582F316f142c908fc25";
 
 async function readJsonFiles(dirPath) {
   const vaults = new Map();
