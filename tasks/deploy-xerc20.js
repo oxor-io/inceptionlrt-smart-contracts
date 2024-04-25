@@ -1,52 +1,15 @@
-const fs = require("fs").promises;
-const path = require("path");
 // Assuming config.json contains the necessary values
 const configTemplate = require("./deploy_template.json");
-const addressesPath = "./scripts/migration/addresses";
 
-const factoryAddress = "0xb913bE186110B1119d5B9582F316f142c908fc25";
-
-async function readJsonFiles(dirPath) {
-  const vaults = new Map();
-  try {
-    const files = await fs.readdir(dirPath);
-    const jsonFiles = files.filter((file) => path.extname(file).toLowerCase() === ".json");
-
-    for (const file of jsonFiles) {
-      const filePath = path.join(dirPath, file);
-      const fileContent = await fs.readFile(filePath, "utf8");
-      const jsonData = JSON.parse(fileContent);
-      const modifiedName = file.replace("mainnet_", "").replace(".json", "");
-      vaults.set(modifiedName, jsonData);
-    }
-  } catch (error) {
-    console.error("Error reading JSON files:", error);
-  }
-
-  return vaults;
-}
+// TESTNET 0xA3C21b6e70f0ec15d22988D821eE26dA2295490A
+const factoryAddress = "";
 
 task("deploy-xerc20", "TODO")
-  .addParam("vault", "the name of the vault")
-  .addParam("execute", "DO deploy")
+  .addParam("execute", "whether deploy contract or not (1/0)")
   .setAction(async (taskArgs) => {
-    const inputVaultName = taskArgs["vault"];
     const execute = taskArgs["execute"];
-    const vaults = await readJsonFiles(addressesPath);
 
-    let data = "";
-    for (const [vaultName, vaultData] of vaults) {
-      if (vaultName == inputVaultName) {
-        data = vaultData;
-        break;
-      }
-    }
-    if (data == "") {
-      console.error("the wrong vault name");
-      return;
-    }
-
-    const deployData = await generateCalldata(data, configTemplate);
+    const deployData = await generateCalldata(configTemplate);
     if (execute == "0") {
       console.log(deployData);
     } else {
@@ -55,65 +18,53 @@ task("deploy-xerc20", "TODO")
   });
 
 const deploy = async (deployCallData) => {
-  const xERC20Address = await deployXERC20(factoryAddress, deployCallData);
+  const xERC20Address = await deployXERC20(deployCallData);
   console.log("xERC20 address: ", xERC20Address);
 
   if (deployCallData.homeChain) {
-    const lockBoxAddress = await deployLockBox(factoryAddress, xERC20Address, deployCallData.tokenAddress);
-    console.log("LockBox address: ", lockBoxAddress);
+    const lockBoxAddress = await deployLockBox(xERC20Address, deployCallData.tokenAddress);
+    console.log("Lockbox address: ", lockBoxAddress);
   }
 };
 
-async function deployXERC20(factoryAddress, xERC20Config) {
+async function deployXERC20(xERC20Config) {
   console.log("... Deploying of xERC20 token ...");
+  const factory = await hre.ethers.getContractAt("ICREATE3Factory", factoryAddress);
 
-  const xERC20Factory = await hre.ethers.getContractFactory("XERC20FactoryDummy");
-  const factory = await xERC20Factory.attach(factoryAddress);
-  const tx = await factory.deployXERC20(
-    xERC20Config.tokenName,
-    xERC20Config.tokenSymbol,
-    xERC20Config.minterLimits,
-    xERC20Config.burnerLimits,
-    xERC20Config.bridges
-  );
+  const tx = await factory.deployXERC20(xERC20Config.tokenName, xERC20Config.tokenSymbol);
   const receipt = await tx.wait();
+  let event = receipt.logs.find((e) => e.eventName === "XERC20Deployed");
 
-  return receipt.events[receipt.events.length - 1].args._xerc20;
+  return event.args._xerc20;
 }
 
-async function deployLockBox(factoryAddress, xERC20Address, baseTokenAddress) {
-  const xERC20Factory = await hre.ethers.getContractFactory("XERC20FactoryDummy");
-  const factory = await xERC20Factory.attach(factoryAddress);
-  console.log(xERC20Address, baseTokenAddress);
+async function deployLockBox(xERC20Address, baseTokenAddress) {
+  console.log("... Deploying of Lockbox ...");
+  const factory = await hre.ethers.getContractAt("ICREATE3Factory", factoryAddress);
+
   let tx = await factory.deployLockbox(xERC20Address, baseTokenAddress, false);
   const receipt = await tx.wait();
+  const event = receipt.logs.find((e) => e.eventName === "LockboxDeployed");
 
-  return receipt.events[receipt.events.length - 1].args._lockbox;
+  return event.args._lockbox;
 }
 
-const generateCalldata = async (vaultData, configFile) => {
+const generateCalldata = async (configFile) => {
   /// get token name and symbol
   let homeChain = false;
-  let tokenName, tokenSymbol;
   try {
-    const token = await hre.ethers.getContractAt("InceptionToken", vaultData.iTokenAddress);
-    tokenName = await token.name();
-    tokenSymbol = await token.symbol();
+    const token = await hre.ethers.getContractAt("InceptionToken", configFile.originTokenAddress);
+    await token.name();
     homeChain = true;
   } catch (err) {
     // get from the config file -> destinationChain
     homeChain = false;
-    tokenName = configFile.tokenName;
-    tokenSymbol = configFile.tokenSymbol;
   }
 
   return {
     homeChain: homeChain,
-    tokenAddress: vaultData.iTokenAddress,
-    tokenName: tokenName,
-    tokenSymbol: tokenSymbol,
-    minterLimits: [configFile.bridgeDetails.mintLimit],
-    burnerLimits: [configFile.bridgeDetails.burnLimit],
-    bridges: [configFile.bridgeDetails.bridge],
+    tokenAddress: configFile.originTokenAddress,
+    tokenName: configFile.tokenName,
+    tokenSymbol: configFile.tokenSymbol,
   };
 };
