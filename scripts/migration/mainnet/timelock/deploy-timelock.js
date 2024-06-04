@@ -1,7 +1,7 @@
 const { ethers } = require("hardhat");
 
 /// multisig
-const ownerAddress = "0x8e6C8799B542E507bfDDCA1a424867e885D96e79";
+const ownerAddress = "0x7fAE3db2f5d0F173AEe2ce98668bCDCfC904d0aE";
 
 const minDelay = "86400";
 
