@@ -12,7 +12,6 @@ import "../../interfaces/IInceptionToken.sol";
 import "../../interfaces/IRebalanceStrategy.sol";
 import "../../interfaces/IInceptionRatioFeed.sol";
 
-
 /// @author The InceptionLRT team
 /// @title The InceptionOmniVault contract
 contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
@@ -45,6 +44,7 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
     uint256 public maxFlashFeeRate;
     uint256 public optimalWithdrawalRate;
     uint256 public withdrawUtilizationKink;
+    uint256 public constant ETHEREUM_CHAIN_ID = 1337;
 
     function __InceptionOmniVault_init(
         string memory vaultName,
@@ -145,6 +145,24 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         }
     }
 
+    // Function to handle ETH withdrawal on the Ethereum side
+    function withdrawToRebalancer(
+        uint256 amount,
+        address rebalancerAddress
+    ) external onlyOwner nonReentrant whenNotPaused {
+        require(rebalancerAddress != address(0), "Invalid rebalancer address");
+        require(amount > 0, "Amount must be greater than zero");
+
+        // Checking the bridge's balance
+        require(address(this).balance >= amount, "Insufficient bridge balance");
+
+        // Sending ETH to the specified address (e.g., Rebalancer.sol)
+        (bool success, ) = rebalancerAddress.call{value: amount}("");
+        require(success, "ETH transfer failed");
+
+        emit WithdrawnToRebalancer(rebalancerAddress, amount);
+    }
+
     /*/////////////////////////////////////////////
     ///////// Flash Withdrawal functions /////////
     ///////////////////////////////////////////*/
@@ -194,17 +212,19 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
     }
 
     function _calculateDepositBonus(
-        uint256 amount, uint256 capacity
+        uint256 amount,
+        uint256 capacity
     ) internal view returns (uint256 bonus) {
-        uint256 optimalCapacity = (targetCapacity * depositUtilizationKink) / MAX_PERCENT;
+        uint256 optimalCapacity = (targetCapacity * depositUtilizationKink) /
+            MAX_PERCENT;
 
         if (amount > 0 && capacity < optimalCapacity) {
             uint256 replenished = amount;
             if (optimalCapacity < capacity + amount)
                 replenished = optimalCapacity - capacity;
 
-            uint256 bonusSlope = ((maxBonusRate - optimalBonusRate) *
-                1e18) / ((optimalCapacity * 1e18) / targetCapacity);
+            uint256 bonusSlope = ((maxBonusRate - optimalBonusRate) * 1e18) /
+                ((optimalCapacity * 1e18) / targetCapacity);
             uint256 bonusPercent = maxBonusRate -
                 (bonusSlope * (capacity + replenished / 2)) /
                 targetCapacity;
@@ -223,15 +243,31 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         }
     }
 
+    /// @notice sending Arbitrum ETH to the Ethereum Bridge
+    /// @param receiver address of the Rebalancer.sol
+    function transferEthToEthereum(
+        uint256 amount,
+        address receiver
+    ) external onlyOwner {
+        require(amount > 0, "Amount must be greater than zero");
+
+        bridge.deposit{value: amount}(
+            address(0),
+            ETHEREUM_CHAIN_ID,
+            receiver,
+            amount
+        );
+    }
+
     /// @dev Function to calculate flash withdrawal fee based on the utilization rate
     function calculateFlashUnstakeFee(
         uint256 amount
     ) public view returns (uint256 fee) {
-
         uint256 capacity = getFlashCapacity();
         if (amount > capacity) revert InsufficientCapacity(capacity);
 
-        uint256 optimalCapacity = (targetCapacity * withdrawUtilizationKink) / MAX_PERCENT;
+        uint256 optimalCapacity = (targetCapacity * withdrawUtilizationKink) /
+            MAX_PERCENT;
 
         /// @dev the utilization rate is greater 1, [ :100] %
         if (amount > 0 && capacity > targetCapacity) {
