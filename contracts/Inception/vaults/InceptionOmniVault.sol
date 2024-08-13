@@ -45,6 +45,9 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
     uint256 public optimalWithdrawalRate;
     uint256 public withdrawUtilizationKink;
     uint256 public constant ETHEREUM_CHAIN_ID = 1337;
+    address public bridgerEOA;
+
+    event SentToBridgerEOA(uint256 indexed amount);
 
     function __InceptionOmniVault_init(
         string memory vaultName,
@@ -145,22 +148,15 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         }
     }
 
-    // Function to handle ETH withdrawal on the Ethereum side
-    function withdrawToRebalancer(
-        uint256 amount,
-        address rebalancerAddress
+    // Function to handle ETH withdrawal to the Ethereum side
+    function withdrawToBridgerEOA(
+        uint256 amount
     ) external onlyOwner nonReentrant whenNotPaused {
-        require(rebalancerAddress != address(0), "Invalid rebalancer address");
-        require(amount > 0, "Amount must be greater than zero");
+        require(address(this).balance >= amount, "OmniVault: Invalid amount");
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "OmniVault: ETH transfer failed");
 
-        // Checking the bridge's balance
-        require(address(this).balance >= amount, "Insufficient bridge balance");
-
-        // Sending ETH to the specified address (e.g., Rebalancer.sol)
-        (bool success, ) = rebalancerAddress.call{value: amount}("");
-        require(success, "ETH transfer failed");
-
-        emit WithdrawnToRebalancer(rebalancerAddress, amount);
+        emit SentToBridgerEOA(amount);
     }
 
     /*/////////////////////////////////////////////
