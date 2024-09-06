@@ -11,6 +11,7 @@ import "../../interfaces/IInceptionOmniVault.sol";
 import "../../interfaces/IInceptionToken.sol";
 import "../../interfaces/IRebalanceStrategy.sol";
 import "../../interfaces/IInceptionRatioFeed.sol";
+import "./ICrossChainAdapter.sol";
 
 /// @author The InceptionLRT team
 /// @title The InceptionOmniVault contract
@@ -30,6 +31,8 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
     address public treasuryAddress;
     IInceptionRatioFeed public ratioFeed;
 
+    ICrossChainAdapter public crossChainAdapter;
+
     uint256 public depositBonusAmount;
     uint256 public targetCapacity;
 
@@ -44,20 +47,21 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
     uint256 public maxFlashFeeRate;
     uint256 public optimalWithdrawalRate;
     uint256 public withdrawUtilizationKink;
-    uint256 public constant ETHEREUM_CHAIN_ID = 1337;
-    address public bridgerEOA;
 
-    event SentToBridgerEOA(uint256 indexed amount);
+    event AssetsInfoSentToL1(uint256 tokensAmount, uint256 ethAmount);
+    event EthSentToL1(uint256 ethAmount);
 
     function __InceptionOmniVault_init(
         string memory vaultName,
-        IInceptionToken _inceptionToken
+        IInceptionToken _inceptionToken,
+        ICrossChainAdapter _crossChainAdapter
     ) internal {
         __Ownable_init();
         __InceptionOmniAssetsHandler_init();
 
         name = vaultName;
         inceptionToken = _inceptionToken;
+        crossChainAdapter = _crossChainAdapter;
         /// TODO
         treasuryAddress = msg.sender;
         minAmount = 100;
@@ -148,17 +152,6 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         }
     }
 
-    // Function to handle ETH withdrawal to the Ethereum side
-    function withdrawToBridgerEOA(
-        uint256 amount
-    ) external onlyOwner nonReentrant whenNotPaused {
-        require(address(this).balance >= amount, "OmniVault: Invalid amount");
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
-        require(success, "OmniVault: ETH transfer failed");
-
-        emit SentToBridgerEOA(amount);
-    }
-
     /*/////////////////////////////////////////////
     ///////// Flash Withdrawal functions /////////
     ///////////////////////////////////////////*/
@@ -239,22 +232,6 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         }
     }
 
-    /// @notice sending Arbitrum ETH to the Ethereum Bridge
-    /// @param receiver address of the Rebalancer.sol
-    function transferEthToEthereum(
-        uint256 amount,
-        address receiver
-    ) external onlyOwner {
-        require(amount > 0, "Amount must be greater than zero");
-
-        bridge.deposit{value: amount}(
-            address(0),
-            ETHEREUM_CHAIN_ID,
-            receiver,
-            amount
-        );
-    }
-
     /// @dev Function to calculate flash withdrawal fee based on the utilization rate
     function calculateFlashUnstakeFee(
         uint256 amount
@@ -293,6 +270,42 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
                 targetCapacity;
             fee += (amount * bonusPercent) / MAX_PERCENT;
         }
+    }
+
+    /**
+     * @dev Sends the information about the total amount of tokens and ETH held by this contract to L1 using CrossChainAdapter.
+     * @notice This only sends the info, not the actual assets.
+     */
+    function sendAssetsInfoToL1() external {
+        uint256 tokensAmount = getTotalTokens();
+        uint256 ethAmount = getTotalEth();
+
+        // Send the assets information (not the actual assets) to L1
+        crossChainAdapter.sendAssetsInfoToL1(tokensAmount, ethAmount);
+
+        emit AssetsInfoSentToL1(tokensAmount, ethAmount);
+    }
+
+    /**
+     * @dev Sends a specific amount of ETH to L1 using CrossChainAdapter.
+     * @notice This actually sends ETH, unlike sendAssetsInfoToL1 which only sends information.
+     * @param amount The amount of ETH to send to L1.
+     */
+    function sendEthToL1(uint256 amount) external {
+        require(amount <= getTotalEth(), "Not enough ETH");
+
+        // Send ETH to L1 using the CrossChainAdapter
+        crossChainAdapter.sendEthToL1{value: amount}(amount);
+
+        emit EthSentToL1(amount);
+    }
+
+    function getTotalTokens() public view returns (uint256) {
+        return IERC20(address(inceptionToken)).balanceOf(address(this));
+    }
+
+    function getTotalEth() public view returns (uint256) {
+        return address(this).balance;
     }
 
     /*//////////////////////////////
