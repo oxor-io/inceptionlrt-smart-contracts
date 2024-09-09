@@ -55,7 +55,7 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         string memory vaultName,
         IInceptionToken _inceptionToken,
         ICrossChainAdapter _crossChainAdapter
-    ) internal {
+    ) public initializer {
         __Ownable_init();
         __InceptionOmniAssetsHandler_init();
 
@@ -190,6 +190,10 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         _transferAssetTo(receiver, amount);
 
         emit FlashWithdraw(claimer, receiver, claimer, amount, iShares, fee);
+    }
+
+    function mintTokensToVault(uint256 amount) external onlyOwner {
+        inceptionToken.mint(address(this), amount);
     }
 
     /// @notice Function to calculate deposit bonus based on the utilization rate

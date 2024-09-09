@@ -13,11 +13,13 @@ contract InEthOmniVault is InceptionOmniVault {
     }
 
     function initialize(
-        IInceptionToken _inceptionToken
+        IInceptionToken _inceptionToken,
+        ICrossChainAdapter _crossChainAdapter
     ) external initializer {
         __InceptionOmniVault_init(
             "InEthOmniVault",
-            _inceptionToken
+            _inceptionToken,
+            _crossChainAdapter
         );
     }
 }

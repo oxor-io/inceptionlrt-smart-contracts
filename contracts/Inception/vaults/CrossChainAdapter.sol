@@ -17,10 +17,7 @@ contract CrossChainAdapter is Ownable {
         uint256 indexed to,
         uint256 indexed ticketId
     );
-    event EthSentToL1(
-        uint256 indexed amount,
-        uint256 indexed ticketId
-    );
+    event EthSentToL1(uint256 indexed amount, uint256 indexed ticketId);
 
     constructor(address _inboxAddress, address _l1Target) {
         inboxAddress = _inboxAddress;

@@ -11,12 +11,6 @@ require("./tasks/deploy-rate-provider");
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   networks: {
-    hardhat: {
-      forking: {
-        url: `${process.env.RPC_URL_HOLESKY}`,
-        blockNumber: 1442030,
-      },
-    },
     localhost: {
       url: "http://127.0.0.1:8545/",
     },
