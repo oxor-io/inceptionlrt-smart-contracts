@@ -38,13 +38,18 @@ async function main() {
     console.log(`InceptionOmniVault ETH balance: ${ethers.formatUnits(vaultEthBalance, 18)} ETH`);
     console.log(`InceptionOmniVault InETH balance: ${ethers.formatUnits(vaultInETHBalance, 18)} InETH`);
 
-    // 6. Call the sendAssetsInfoToL1 function (ensure the user is allowed to call it)
-    try {
-        const sendAssetsInfoTx = await inceptionOmniVault.connect(user).sendAssetsInfoToL1();
-        await sendAssetsInfoTx.wait();
-        console.log(`Sent assets info to L1 from InceptionOmniVault`);
-    } catch (error) {
-        console.error("Failed to send assets info to L1: ", error);
+    // 6. Call the sendAssetsInfoToL1 function and capture the emitted event
+    const sendAssetsInfoTx = await inceptionOmniVault.connect(user).sendAssetsInfoToL1(10, 5); // Example amounts
+    const receipt = await sendAssetsInfoTx.wait(); // Wait for the transaction to be mined
+
+    // 7. Extract the AssetsInfoSentToL1 event and log the ticketId
+    const event = receipt.events?.find(event => event.event === "AssetsInfoSentToL1");
+
+    if (event) {
+        const ticketId = event.args?.ticketId;
+        console.log(`Assets info sent to L1 with ticketId: ${ticketId.toString()}`);
+    } else {
+        console.log("AssetsInfoSentToL1 event not found in the transaction receipt.");
     }
 }
 
