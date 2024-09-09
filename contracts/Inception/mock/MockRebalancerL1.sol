@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+ * @title CrossChainAdapter
+ * @author The InceptionLRT team
+ * @dev mocks a real L1 Rebalancer for testing purposes
+ */
 contract MockRebalancerL1 {
-
     // State variables to store the tokens and ETH amount
     uint256 public tokensAmount;
     uint256 public ethAmount;
@@ -15,7 +19,10 @@ contract MockRebalancerL1 {
      * @param _tokensAmount The amount of tokens sent to L1
      * @param _ethAmount The amount of ETH sent to L1
      */
-    function receiveAssetsInfo(uint256 _tokensAmount, uint256 _ethAmount) external {
+    function receiveAssetsInfo(
+        uint256 _tokensAmount,
+        uint256 _ethAmount
+    ) external {
         // Update the state with the received values
         tokensAmount = _tokensAmount;
         ethAmount = _ethAmount;

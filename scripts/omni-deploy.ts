@@ -16,14 +16,14 @@ async function main() {
     const inETHAddress = await inETH.getAddress();
     console.log(`InceptionToken deployed at: ${inETHAddress}`);
 
-    // 2. Deploy CrossChainAdapter
-    const adapterFactory = await ethers.getContractFactory("CrossChainAdapter");
+    // 2. Deploy ArbCrossChainAdapter
+    const adapterFactory = await ethers.getContractFactory("ArbCrossChainAdapter");
     const crossChainAdapter = await adapterFactory.deploy(
         "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"  // L1 target address
     );
     await crossChainAdapter.waitForDeployment();
     const crossChainAdapterAddress = await crossChainAdapter.getAddress();
-    console.log(`CrossChainAdapter deployed at: ${crossChainAdapterAddress}`);
+    console.log(`ArbCrossChainAdapter deployed at: ${crossChainAdapterAddress}`);
 
     // 3. Deploy InceptionRatioFeed
     const ratioFeedFactory = await ethers.getContractFactory("InceptionRatioFeed");
@@ -42,6 +42,10 @@ async function main() {
     await inceptionOmniVault.waitForDeployment();
     const inceptionOmniVaultAddress = await inceptionOmniVault.getAddress();
     console.log(`InceptionOmniVault deployed at: ${inceptionOmniVaultAddress}`);
+
+    const setVaultTx = await crossChainAdapter.setVault(inceptionOmniVaultAddress);
+    await setVaultTx.wait();
+    console.log("Vault address set in ArbCrossChainAdapter");
 
     // 5. Set the RatioFeed in InceptionOmniVault
     const setRatioFeedTx = await inceptionOmniVault.setRatioFeed(ratioFeedAddress);

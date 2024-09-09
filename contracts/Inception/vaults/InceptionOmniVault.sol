@@ -11,7 +11,7 @@ import "../../interfaces/IInceptionOmniVault.sol";
 import "../../interfaces/IInceptionToken.sol";
 import "../../interfaces/IRebalanceStrategy.sol";
 import "../../interfaces/IInceptionRatioFeed.sol";
-import "./ICrossChainAdapter.sol";
+import "../../interfaces/ICrossChainAdapter.sol";
 
 /// @author The InceptionLRT team
 /// @title The InceptionOmniVault contract
@@ -50,6 +50,9 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
 
     event AssetsInfoSentToL1(uint256 tokensAmount, uint256 ethAmount);
     event EthSentToL1(uint256 ethAmount);
+
+    error MessageToL1Failed(uint256 tokenAmount, uint256 ethAmount);
+    error EthToL1Failed(uint256 ethAmount);
 
     function __InceptionOmniVault_init(
         string memory vaultName,
@@ -285,7 +288,14 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         uint256 ethAmount = getTotalEth();
 
         // Send the assets information (not the actual assets) to L1
-        crossChainAdapter.sendAssetsInfoToL1(tokensAmount, ethAmount);
+        bool success = crossChainAdapter.sendAssetsInfoToL1(
+            tokensAmount,
+            ethAmount
+        );
+
+        if (!success) {
+            revert MessageToL1Failed(tokensAmount, ethAmount);
+        }
 
         emit AssetsInfoSentToL1(tokensAmount, ethAmount);
     }
@@ -299,7 +309,11 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         require(amount <= getTotalEth(), "Not enough ETH");
 
         // Send ETH to L1 using the CrossChainAdapter
-        crossChainAdapter.sendEthToL1{value: amount}(amount);
+        bool success = crossChainAdapter.sendEthToL1{value: amount}();
+
+        if (!success) {
+            revert EthToL1Failed(amount);
+        }
 
         emit EthSentToL1(amount);
     }

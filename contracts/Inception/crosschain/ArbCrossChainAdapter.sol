@@ -7,9 +7,27 @@ import "@arbitrum/nitro-contracts/src/bridge/IOutbox.sol";
 import "@arbitrum/nitro-contracts/src/bridge/IBridge.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CrossChainAdapter is Ownable {
+import "../../interfaces/ICrossChainAdapter.sol";
+
+/**
+ * @title CrossChainAdapter
+ * @dev Paul Fomichov
+ */
+
+contract ArbCrossChainAdapter is ICrossChainAdapter, Ownable {
     ArbSys constant arbsys = ArbSys(address(100));
     address public l1Target;
+    address public vault;
+
+    modifier onlyVault() {
+        if (vault == address(0)) {
+            revert VaultNotSet();
+        }
+        if (msg.sender != vault) {
+            revert OnlyVault();
+        }
+        _;
+    }
 
     event AssetsInfoSentToL1(
         uint256 indexed amount,
@@ -29,7 +47,7 @@ contract CrossChainAdapter is Ownable {
     function sendAssetsInfoToL1(
         uint256 tokensAmount,
         uint256 ethAmount
-    ) external {
+    ) external returns (bool success) {
         bytes memory data = abi.encodeWithSignature(
             "receiveAssetsInfo(uint256,uint256)",
             tokensAmount,
@@ -39,30 +57,17 @@ contract CrossChainAdapter is Ownable {
         uint256 withdrawalId = arbsys.sendTxToL1(l1Target, data);
 
         emit AssetsInfoSentToL1(tokensAmount, ethAmount, withdrawalId);
+        return true;
     }
 
-    function sendEthToL1(uint256 amount) external payable {
-        require(msg.value >= amount, "Insufficient ETH for transfer");
+    function sendEthToL1() external payable onlyVault returns (bool success) {
+        uint256 withdrawalId = arbsys.withdrawEth{value: msg.value}(l1Target);
 
-        bytes memory data = abi.encodeWithSignature(
-            "receiveEth(uint256)",
-            amount
-        );
+        emit EthSentToL1(msg.value, withdrawalId);
+        return true;
+    }
 
-        // uint256 withdrawalId = arbsys.sendTxToL1(l1Target, data);
-
-        // Send the ETH from L2 to L1
-        // uint256 ticketId = inbox.createRetryableTicket{value: msg.value}(
-        //     l1Target, // The L1 target contract
-        //     amount, // The amount of ETH to send
-        //     0, // Max submission cost for retryable ticket
-        //     msg.sender, // Refund address if the retryable ticket fails
-        //     msg.sender, // Address to receive the ticket's excess fees
-        //     1000000, // Gas limit for L1 execution (adjust as needed)
-        //     0, // Gas price bid for L1 transaction execution (adjust as needed)
-        //     data // Encoded message data
-        // );
-
-        // emit EthSentToL1(amount, withdrawalId);
+    function setVault(address _vault) external onlyOwner {
+        vault = _vault;
     }
 }

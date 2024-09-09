@@ -4,14 +4,14 @@ async function main() {
     const [user] = await ethers.getSigners();
 
     // NB!
-    const inceptionOmniVaultAddress = "0x02FD4bf23b67dAb2156AEDB390B4756033E82CC4"; // update with deployed vault address
-    const inETHAddress = "0xA4fFCc6a2Ea0182C374B05f016A9702D9cC44B5e"; // update with deployed InETH address
-    const crossChainAdapterAddress = "0x085D22B6Eaf1e64b7bd8f6D69122551594324a15"; // update with deployed CrossChainAdapter address
+    const inceptionOmniVaultAddress = "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"; // update with deployed vault address
+    const inETHAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"; // update with deployed InETH address
+    const crossChainAdapterAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"; // update with deployed CrossChainAdapter address
 
     // 1. Get contract instances
     const inceptionOmniVault = await ethers.getContractAt("InceptionOmniVault", inceptionOmniVaultAddress);
     const inETH = await ethers.getContractAt("InceptionToken", inETHAddress);
-    const crossChainAdapter = await ethers.getContractAt("CrossChainAdapter", crossChainAdapterAddress);
+    const crossChainAdapter = await ethers.getContractAt("ArbCrossChainAdapter", crossChainAdapterAddress);
 
 
     // 2. Check user's ETH and InETH balance before the deposit
