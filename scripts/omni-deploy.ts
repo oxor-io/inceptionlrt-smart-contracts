@@ -19,7 +19,6 @@ async function main() {
     // 2. Deploy CrossChainAdapter
     const adapterFactory = await ethers.getContractFactory("CrossChainAdapter");
     const crossChainAdapter = await adapterFactory.deploy(
-        "0xaAe29B0366299461418F5324a79Afc425BE5ae21", // Arbitrum Inbox Address 
         "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"  // L1 target address
     );
     await crossChainAdapter.waitForDeployment();
