@@ -11,8 +11,17 @@ require("./tasks/deploy-rate-provider");
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   networks: {
-    localhost: {
-      url: "http://127.0.0.1:8545/",
+    local: {
+      url: process.env.LOCAL_RPC || "http://127.0.0.1:8545",
+      chainId: 1337,
+      gasPrice: 20000000000,
+      gas: 6721975,
+    },
+    hardhat: {
+      forking: {
+        url: `${process.env.RPC_URL_HOLESKY}`,
+        blockNumber: 1442030,
+      },
     },
     mainnet: {
       accounts: [`0x${process.env.DEPLOYER_PRIVATE_KEY}`],
