@@ -58,5 +58,11 @@ interface IInceptionOmniVault {
         uint256 newWithdrawUtilizationKink
     );
 
+    event AssetsInfoSentToL1(uint256 tokensAmount, uint256 ethAmount);
+    event EthSentToL1(uint256 ethAmount);
+
+    error MessageToL1Failed(uint256 tokenAmount, uint256 ethAmount);
+    error EthToL1Failed(uint256 ethAmount);
+
     function ratio() external view returns (uint256);
 }

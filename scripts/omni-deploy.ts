@@ -67,8 +67,8 @@ async function main() {
 
     // 8. Call the vault function to mint 20 InETH tokens to itself
     const mintAmount = ethers.parseUnits("20", 18); // 20 InETH
-    const mintTx = await inceptionOmniVault.mintTokensToVault(mintAmount);
-    await mintTx.wait();
+    // const mintTx = await inceptionOmniVault.mintTokensToVault(mintAmount);
+    // await mintTx.wait();
     console.log(`Minted 20 InETH to InceptionOmniVault at ${inceptionOmniVaultAddress}`);
 
     // 9. Get the InETH balance of InceptionOmniVault

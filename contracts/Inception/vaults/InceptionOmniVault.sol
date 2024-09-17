@@ -48,12 +48,6 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
     uint256 public optimalWithdrawalRate;
     uint256 public withdrawUtilizationKink;
 
-    event AssetsInfoSentToL1(uint256 tokensAmount, uint256 ethAmount);
-    event EthSentToL1(uint256 ethAmount);
-
-    error MessageToL1Failed(uint256 tokenAmount, uint256 ethAmount);
-    error EthToL1Failed(uint256 ethAmount);
-
     function __InceptionOmniVault_init(
         string memory vaultName,
         IInceptionToken _inceptionToken,
@@ -195,10 +189,6 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
         emit FlashWithdraw(claimer, receiver, claimer, amount, iShares, fee);
     }
 
-    function mintTokensToVault(uint256 amount) external onlyOwner {
-        inceptionToken.mint(address(this), amount);
-    }
-
     /// @notice Function to calculate deposit bonus based on the utilization rate
     function calculateDepositBonus(
         uint256 amount
@@ -305,7 +295,7 @@ contract InceptionOmniVault is IInceptionOmniVault, InceptionOmniAssetsHandler {
      * @notice This actually sends ETH, unlike sendAssetsInfoToL1 which only sends information.
      * @param amount The amount of ETH to send to L1.
      */
-    function sendEthToL1(uint256 amount) external {
+    function sendEthToL1(uint256 amount) external onlyOwner {
         require(amount <= getTotalEth(), "Not enough ETH");
 
         // Send ETH to L1 using the CrossChainAdapter
