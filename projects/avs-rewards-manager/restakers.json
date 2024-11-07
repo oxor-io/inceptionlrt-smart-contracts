@@ -1,0 +1,6 @@
+{
+  "network": {
+    "mainnet": ["0x23c57052a049427ea9885f86da336a0f688c289f", "0xabcdefabcdefabcdefabcdefabcdefabcdef"],
+    "testnet": ["0x96699421cD5142238514C2d2Ed934f23556ad4A8", "0xCbC470a32E36Cb1116Eaa70c70FCdb92860d97fC"]
+  }
+}
