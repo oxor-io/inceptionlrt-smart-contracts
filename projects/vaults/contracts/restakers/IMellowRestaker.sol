@@ -49,6 +49,8 @@ contract IMellowRestaker is
     uint256 public depositSlippage; // BasisPoints 10,000 = 100%
     uint256 public withdrawSlippage;
 
+    IERC20 internal _defaultCollateral;
+
     modifier onlyTrustee() {
         if (msg.sender != _vault && msg.sender != _trusteeManager)
             revert NotVaultOrTrusteeManager();
@@ -64,6 +66,7 @@ contract IMellowRestaker is
         IMellowDepositWrapper[] memory _mellowDepositWrapper,
         IMellowVault[] memory _mellowVault,
         IERC20 asset,
+        IERC20 defaultCollateral,
         address trusteeManager
     ) public initializer {
         __Pausable_init();
@@ -81,6 +84,7 @@ contract IMellowRestaker is
             mellowVaults.push(_mellowVault[i]);
         }
         _asset = asset;
+        _defaultCollateral = defaultCollateral;
         _trusteeManager = trusteeManager;
 
         requestDeadline = 15 days;
@@ -306,78 +310,18 @@ contract IMellowRestaker is
         uint256 amount,
         IMellowVault mellowVault
     ) public view returns (uint256 lpAmount) {
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
-
-        (address[] memory tokens, uint256[] memory totalAmounts) = mellowVault
-            .underlyingTvl();
-
-        uint128[] memory ratiosX96 = IMellowRatiosOracle(
-            mellowVault.configurator().ratiosOracle()
-        ).getTargetRatiosX96(address(mellowVault), true);
-
-        uint256 ratioX96 = type(uint256).max;
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (ratiosX96[i] == 0) continue;
-            uint256 ratioX96_ = FullMath.mulDiv(
-                amounts[i],
-                mellowVault.Q96(),
-                ratiosX96[i]
-            );
-            if (ratioX96_ < ratioX96) ratioX96 = ratioX96_;
-        }
-        if (ratioX96 == 0) revert ValueZero();
-
-        uint256 depositValue = 0;
-        uint256 totalValue = 0;
-        {
-            IMellowPriceOracle priceOracle = IMellowPriceOracle(
-                mellowVault.configurator().priceOracle()
-            );
-            for (uint256 i = 0; i < tokens.length; i++) {
-                uint256 priceX96 = priceOracle.priceX96(
-                    address(mellowVault),
-                    tokens[i]
-                );
-                totalValue += totalAmounts[i] == 0
-                    ? 0
-                    : FullMath.mulDivRoundingUp(
-                        totalAmounts[i],
-                        priceX96,
-                        mellowVault.Q96()
-                    );
-
-                if (ratiosX96[i] == 0) continue;
-
-                amount = FullMath.mulDiv(
-                    ratioX96,
-                    ratiosX96[i],
-                    mellowVault.Q96()
-                );
-                depositValue += FullMath.mulDiv(
-                    amount,
-                    priceX96,
-                    mellowVault.Q96()
-                );
-            }
-        }
-
-        uint256 totalSupply = mellowVault.totalSupply();
-        lpAmount = FullMath.mulDiv(depositValue, totalSupply, totalValue);
+        return FullMath.mulDiv(amount, 1e18, vaultRatio(address(mellowVault)));
     }
 
     function lpAmountToAmount(
         uint256 lpAmount,
         IMellowVault mellowVault
     ) public view returns (uint256) {
-        IMellowVault.ProcessWithdrawalsStack memory s = mellowVault
-            .calculateStack();
-        uint256 wstEthAmount = FullMath.mulDiv(
-            FullMath.mulDiv(lpAmount, s.totalValue, s.totalSupply),
-            s.ratiosX96[0],
-            s.ratiosX96Value
-        );
-        return wstEthAmount;
+        return FullMath.mulDiv(lpAmount, vaultRatio(address(mellowVault)), 1e18);
+    }
+
+    function vaultRatio(address _mellowVault) public view returns (uint256) {
+        return (1 ether * (_asset.balanceOf(_mellowVault) + IERC20(_defaultCollateral).balanceOf(_mellowVault))) / IERC20(_mellowVault).totalSupply();
     }
 
     function setVault(address vault) external onlyOwner {

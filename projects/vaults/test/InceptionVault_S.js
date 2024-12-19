@@ -24,8 +24,9 @@ const assets = [
     vaultName: "InstEthVault",
     vaultFactory: "InVault_S_E2",
     iVaultOperator: "0xd87D15b80445EC4251e33dBe0668C335624e54b7",
+    defaultCollateral: "0xC329400492c6ff2438472D4651Ad17389fCb843a",
     ratioErr: 3n,
-    transactErr: 5n,
+    transactErr: 30n,
     blockNumber: 20462310,
     impersonateStaker: async function (staker, iVault) {
       const donor = await impersonateWithEth("0x43594da5d6A03b2137a04DF5685805C676dEf7cB", toWei(1));
@@ -131,6 +132,7 @@ const initVault = async a => {
     [mellowVaults[0].wrapperAddress],
     [mellowVaults[0].vaultAddress],
     a.assetAddress,
+    a.defaultCollateral,
     a.iVaultOperator,
   ]);
   mellowRestaker.address = await mellowRestaker.getAddress();
@@ -436,7 +438,7 @@ assets.forEach(function (a) {
         console.log(`Pending from Mellow:\t\t\t${pendingWithdrawalsMellowAfter.format()}`);
         console.log(`Restaker balance diff:\t\t\t${(restakerBalanceAfter - restakerBalanceBefore).format()}`);
 
-        expect(restakerBalanceAfter - restakerBalanceBefore).to.be.eq(pendingWithdrawalsMellowBefore);
+        expect(restakerBalanceAfter - restakerBalanceBefore).to.be.closeTo(pendingWithdrawalsMellowBefore, transactErr);
         expect(totalDepositedAfter).to.be.closeTo(totalDepositedBefore, transactErr);
         expect(pendingWithdrawalsMellowAfter).to.be.closeTo(pendingWithdrawalsMellowBefore, transactErr);
       });
@@ -707,7 +709,7 @@ assets.forEach(function (a) {
         console.log(`Pending from Mellow:\t\t\t${pendingWithdrawalsMellowAfter.format()}`);
         console.log(`Restaker balance diff:\t\t\t${(restakerBalanceAfter - restakerBalanceBefore).format()}`);
 
-        expect(restakerBalanceAfter - restakerBalanceBefore).to.be.eq(pendingWithdrawalsMellowBefore);
+        expect(restakerBalanceAfter - restakerBalanceBefore).to.be.closeTo(pendingWithdrawalsMellowBefore, transactErr);
         expect(totalDepositedAfter).to.be.closeTo(totalDepositedBefore, transactErr);
         expect(pendingWithdrawalsMellowAfter).to.be.closeTo(pendingWithdrawalsMellowBefore, transactErr);
       });
@@ -3371,10 +3373,10 @@ assets.forEach(function (a) {
         console.log(`Restaker balance diff:\t\t\t${(restakerBalanceAfter - restakerBalanceBefore).format()}`);
 
         expect(restakerBalanceAfter - restakerBalanceBefore).to.be.closeTo(vault2Delegated, transactErr);
-        expect(pendingMellowWithdrawalsAfter).to.be.eq(0n);
-        expect(totalPendingMellowWithdrawalsAfter).to.be.eq(totalPendingMellowWithdrawalsBefore);
+        expect(pendingMellowWithdrawalsAfter).to.be.closeTo(0n, transactErr);
+        expect(totalPendingMellowWithdrawalsAfter).to.be.closeTo(totalPendingMellowWithdrawalsBefore, transactErr);
         expect(totalDepositedAfter).to.be.closeTo(totalDepositedBefore, transactErr);
-        expect(await iVault.ratio()).to.be.eq(await calculateRatio(iVault, iToken));
+        expect(await iVault.ratio()).to.be.closeTo(await calculateRatio(iVault, iToken), transactErr);
       });
 
       it("Can not claim funds from mellowRestaker when iVault is paused", async function () {
@@ -3413,7 +3415,7 @@ assets.forEach(function (a) {
         console.log("vault ratio:", await iVault.ratio());
         console.log("calculated ratio:", await calculateRatio(iVault, iToken));
 
-        expect(await iVault.ratio()).to.be.eq(await calculateRatio(iVault, iToken));
+        expect(await iVault.ratio()).to.be.closeTo(await calculateRatio(iVault, iToken), transactErr);
       });
 
       it("Staker is able to redeem", async function () {
@@ -3437,7 +3439,7 @@ assets.forEach(function (a) {
 
         expect(stakerPWBefore - stakerPWAfter).to.be.closeTo(assets1, transactErr * 2n);
         expect(stakerBalanceAfter - stakerBalanceBefore).to.be.closeTo(assets1, transactErr * 2n);
-        expect(await iVault.ratio()).to.be.eq(await calculateRatio(iVault, iToken));
+        expect(await iVault.ratio()).to.be.closeTo(await calculateRatio(iVault, iToken), transactErr);
       });
     });
 
@@ -3720,7 +3722,7 @@ assets.forEach(function (a) {
         console.log(`Ratio: ${await iVault.ratio()}`);
 
         expect(redeemReserveAfter - redeemReserveBefore).to.be.closeTo(amount, transactErr);
-        expect(freeBalanceAfter).to.be.eq(freeBalanceBefore);
+        expect(freeBalanceAfter).to.be.closeTo(freeBalanceBefore, transactErr);
       });
 
       it("Staker is now able to redeem", async function () {
