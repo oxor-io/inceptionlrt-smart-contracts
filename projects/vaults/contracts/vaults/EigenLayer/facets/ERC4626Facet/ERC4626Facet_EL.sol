@@ -116,13 +116,14 @@ contract ERC4626Facet_EL is InceptionVaultStorage_EL {
 
         // update global state and claimer's state
         totalAmountToWithdraw += amount;
-        Withdrawal storage genRequest = _claimerWithdrawals[receiver];
+        SlashedWithdrawal storage genRequest = _claimerSlashedWithdrawals[receiver];
         genRequest.amount += _getAssetReceivedAmount(amount);
-        claimerWithdrawalsQueue.push(
-            Withdrawal({
-                epoch: claimerWithdrawalsQueue.length,
+        claimerSlashedWithdrawalsQueue.push(
+            SlashedWithdrawal({
+                epoch: claimerSlashedWithdrawalsQueue.length,
                 receiver: receiver,
-                amount: _getAssetReceivedAmount(amount)
+                amount: _getAssetReceivedAmount(amount),
+                iShares: iShares
             })
         );
 
@@ -207,21 +208,27 @@ contract ERC4626Facet_EL is InceptionVaultStorage_EL {
         uint256 numOfWithdrawals = availableWithdrawals.length;
         uint256[] memory redeemedWithdrawals = new uint256[](numOfWithdrawals);
 
-        Withdrawal storage genRequest = _claimerWithdrawals[receiver];
+        SlashedWithdrawal storage genRequest = _claimerSlashedWithdrawals[receiver];
         uint256 redeemedAmount;
         for (uint256 i = 0; i < numOfWithdrawals; ++i) {
             uint256 withdrawalNum = availableWithdrawals[i];
-            Withdrawal storage request = claimerWithdrawalsQueue[withdrawalNum];
+            SlashedWithdrawal storage request = claimerSlashedWithdrawalsQueue[withdrawalNum];
             uint256 amount = request.amount;
+
             // update the genRequest and the global state
             genRequest.amount -= amount;
-
             totalAmountToWithdraw -= _getAssetWithdrawAmount(amount);
             redeemReservedAmount -= amount;
-            redeemedAmount += amount;
             redeemedWithdrawals[i] = withdrawalNum;
 
-            delete claimerWithdrawalsQueue[availableWithdrawals[i]];
+            // slashed
+            uint256 amountAfterClaim = convertToAssets(request.iShares);
+            if (amountAfterClaim < amount) {
+                amount = amountAfterClaim;
+            }
+
+            redeemedAmount += amount;
+            delete claimerSlashedWithdrawalsQueue[availableWithdrawals[i]];
         }
 
         // let's update the lowest epoch associated with the claimer

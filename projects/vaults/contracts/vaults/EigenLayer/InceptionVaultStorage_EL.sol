@@ -117,6 +117,11 @@ contract InceptionVaultStorage_EL is
 
     mapping(bytes4 => FuncData) internal _selectorToTarget;
 
+    uint256 public pendingSlashed;
+    SlashedWithdrawal[] public claimerSlashedWithdrawalsQueue;
+    mapping(address => SlashedWithdrawal) internal _claimerSlashedWithdrawals;
+
+
     /**
      * @notice Initializes the Inception Assets Handler
      * @dev This function is called during contract deployment.
@@ -206,7 +211,7 @@ contract InceptionVaultStorage_EL is
         view
         returns (uint256)
     {
-        return _claimerWithdrawals[claimer].amount;
+        return _claimerSlashedWithdrawals[claimer].amount;
     }
 
     /**
@@ -222,14 +227,14 @@ contract InceptionVaultStorage_EL is
     {
         // get the general request
         uint256 index;
-        Withdrawal memory genRequest = _claimerWithdrawals[claimer];
+        SlashedWithdrawal memory genRequest = _claimerSlashedWithdrawals[claimer];
         uint256[] memory availableWithdrawals = new uint256[](
             epoch - genRequest.epoch
         );
         if (genRequest.amount == 0) return (false, availableWithdrawals);
 
         for (uint256 i = 0; i < epoch; ++i) {
-            if (claimerWithdrawalsQueue[i].receiver == claimer) {
+            if (claimerSlashedWithdrawalsQueue[i].receiver == claimer) {
                 able = true;
                 availableWithdrawals[index] = i;
                 ++index;
