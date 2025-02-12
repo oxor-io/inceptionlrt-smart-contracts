@@ -365,7 +365,7 @@ const initVault = async a => {
 };
 
 assets.forEach(function(a) {
-  describe("Slashing", function() {
+  describe("Withdrawal slashing", function() {
     this.timeout(150000);
 
     let iToken,
@@ -432,7 +432,7 @@ assets.forEach(function(a) {
       }
     });
 
-    it("slash", async function() {
+    it("One slashed withdrawal", async function() {
       // make first deposit 10 eth
       let deposited = toWei(10);
       let tx = await iVault4626.connect(staker).deposit(deposited, staker2.address);
