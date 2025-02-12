@@ -20,6 +20,8 @@ import {IStrategyManager, IStrategy} from "../../interfaces/eigenlayer-vault/eig
 import {Convert} from "../../lib/Convert.sol";
 import {InceptionLibrary} from "../../lib/InceptionLibrary.sol";
 
+import "hardhat/console.sol";
+
 /**
  * @title InceptionVaultStorage_EL
  * @author The InceptionLRT team
@@ -143,6 +145,12 @@ contract InceptionVaultStorage_EL is
      * @return The total assets delegated, held in the vault, and pending withdrawal.
      */
     function getTotalDeposited() public view returns (uint256) {
+//        console.logString("<--->");
+//        console.logUint(getTotalDelegated());
+//        console.logUint(totalAssets());
+//        console.logUint(_pendingWithdrawalAmount);
+//        console.logString("<--->");
+
         return
             getTotalDelegated() +
             totalAssets() +

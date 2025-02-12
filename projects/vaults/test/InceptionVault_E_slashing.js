@@ -29,10 +29,10 @@ assets = [
     assetPool: "0x320f3aAB9405e38b955178BBe75c477dECBA0C27",
     vaultName: "InrEthVault",
     vaultFactory: "ERC4626Facet_EL_E2",
-    // strategyManager: "0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6",
+    strategyManager: "0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6",
     assetStrategy: "0x3A8fBdf9e77DFc25d09741f51d3E181b25d0c4E0",
     iVaultOperator: "0xa4341b5Cf43afD2993e1ae47d956F44A2d6Fc08D",
-    // delegationManager: "0xA44151489861Fe9e3055d95adC98FbD462B948e7",
+    delegationManager: "0xA44151489861Fe9e3055d95adC98FbD462B948e7",
     rewardsCoordinator: "0xAcc1fb458a1317E886dB376Fc8141540537E68fE",
     withdrawalDelayBlocks: 400,
     ratioErr: 2n,
@@ -113,11 +113,24 @@ const initVault = async a => {
   restakerImp.address = await restakerImp.getAddress();
   // 4. Delegation manager
   console.log("- Delegation manager");
-  const delegationManager = await ethers.deployContract("DelegationManager");
-  await delegationManager.on("SlashingWithdrawalQueued", (newRoot, migratedWithdrawal) => {
-    console.log(`===Withdrawal queued: ${migratedWithdrawal.shares[0]}`);
-  });
+
+
+  const delegationManagerMock = await ethers.deployContract("DelegationManager");
+  console.log("mock target", delegationManagerMock.target);
+
+  // todo: fix delegationManager implementation address
+  await network.provider.send("hardhat_setCode", [
+    "0xda6f662777adb5209644cf5cf1a61a2f8a99bf48",
+    await network.provider.send("eth_getCode", [delegationManagerMock.target]),
+  ]);
+
+  const delegationManager = await ethers.getContractAt("IDelegationManager", a.delegationManager);
   delegationManager.address = await delegationManager.getAddress();
+
+  await delegationManager.on("SlashingWithdrawalQueued", (newRoot, migratedWithdrawal) => {
+    // console.log(`===Withdrawal queued: ${migratedWithdrawal.shares[0]}`);
+  });
+
   // 5. Ratio feed
   console.log("- Ratio feed");
   const iRatioFeedFactory = await ethers.getContractFactory("InceptionRatioFeed");
@@ -135,7 +148,7 @@ const initVault = async a => {
     libraries: { InceptionLibrary: await iLibrary.getAddress() },
   });
 
-  const strategyManager = await ethers.deployContract("StrategyManager", [delegationManager.address]);
+  const strategyManager = await ethers.getContractAt("IStrategyManager", a.strategyManager);
   strategyManager.address = await strategyManager.getAddress();
 
   const iVault = await upgrades.deployProxy(
@@ -275,7 +288,6 @@ const initVault = async a => {
   await iVault.setSignature(funcSig, facetId, accessId);
 
   funcSig = ERC4626FacetFactory.interface.getFunction("withdraw(uint256,address)").selector;
-  console.log(`funcSig: ${funcSig.toString()}`);
   await iVault.setSignature(funcSig, facetId, accessId);
 
   funcSig = ERC4626FacetFactory.interface.getFunction("flashWithdraw").selector;
@@ -356,7 +368,7 @@ const initVault = async a => {
     let receipt = await tx.wait();
     const events = receipt.logs?.filter(e => e.eventName === "DelegatedTo");
     nodeOperatorToRestaker.set(events[0].args[1], events[0].args[0]);
-  }
+  };
 
   return [
     iToken,
@@ -445,30 +457,58 @@ assets.forEach(function(a) {
     });
 
     it("slash", async function() {
-      const deposited = toWei(10);
-      let tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
+      // make first deposit 10 eth
+      let deposited = toWei(10);
+      let tx = await iVault4626.connect(staker).deposit(deposited, staker2.address);
       await tx.wait();
 
-      await iVault.delegateToOperator(nodeOperators[0], deposited);
-
-      const shares = await iToken.balanceOf(staker.address);
-      tx = await iVault4626.connect(staker).withdraw(shares, staker.address);
+      // make second deposit 10 eth
+      deposited = toWei(10);
+      tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
       await tx.wait();
 
-      let amount = await iVault.totalAmountToWithdraw();
-      await iVault.withdrawFromELAndClaim(nodeOperators[0], amount);
+      console.log("deposited()");
 
-      let totalPW = await iVault.totalAmountToWithdraw();
-      console.log(`TotalAmountToWithdraw: `, totalPW);
+      // // delegate all 20 eth
+      await iVault.delegateToOperator(nodeOperators[0], toWei(20));
 
-      let withdrawals = await iVault.isAbleToRedeem(staker.address);
-      console.log(`Available withdrawals: `, withdrawals);
+      console.log("delegateToOperator()");
+      console.log("-----");
+      console.log("ratio after delegate", await calculateRatio(iVault, iToken));
+      console.log("iVault balance after delegate : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
 
-      console.log(await asset.getAddress());
-      console.log(nodeOperatorToRestaker.get(nodeOperators[0]));
+      // withdraw 5 eth
+      tx = await iVault4626.connect(staker).withdraw(toWei(5), staker.address);
+      await tx.wait();
 
+      console.log("withdraw()");
+      console.log("-----");
+      console.log("ratio after withdraw", await calculateRatio(iVault, iToken));
+      console.log("iVault balance after withdraw : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      // undelegate 5 eth and queue withdrawal
+      await iVault.withdrawFromELAndClaim(nodeOperators[0], toWei(5));
+
+      console.log("withdrawFromELAndClaim()");
+      console.log("-----");
+      let ratio = await calculateRatio(iVault, iToken);
+      console.log("ratio after withdrawFromELAndClaim", ratio);
+      console.log("iVault balance after withdrawFromELAndClaim : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      await ratioFeed.updateRatioBatch([iToken.address], [ratio]);
+
+      // redeem 5 eth
       tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
       await tx.wait();
+
+      console.log("redeem()");
+      console.log("-----");
+      console.log("ratio after redeem", await calculateRatio(iVault, iToken));
+      console.log("iVault balance after redeem : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
     });
   });
 });
