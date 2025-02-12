@@ -382,7 +382,7 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
     function __beforeClaiming(IDelegationManager.Withdrawal[] calldata withdrawals) internal returns (uint256) {
         uint256 expected;
         uint256 withdrawalsNum = claimerSlashedWithdrawalsQueue.length;
-        for (uint256 i = epoch; i < withdrawalsNum; ) {
+        for (uint256 i = 0; i < withdrawalsNum; i++) {
             expected += strategy.sharesToUnderlying(withdrawals[i].shares[0]);
         }
         return expected;
