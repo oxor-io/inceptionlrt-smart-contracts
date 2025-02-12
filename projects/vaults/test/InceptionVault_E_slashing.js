@@ -45,30 +45,6 @@ assets = [
       return staker;
     },
   },
-  // {
-  //   assetName: "stETH",
-  //   assetAddress: "0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034",
-  //   assetPoolName: "LidoMockPool",
-  //   assetPool: "0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034",
-  //   vaultName: "InstEthVault",
-  //   vaultFactory: "ERC4626Facet_EL_E2",
-  //   strategyManager: "0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6",
-  //   assetStrategy: "0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3",
-  //   iVaultOperator: "0xa4341b5Cf43afD2993e1ae47d956F44A2d6Fc08D",
-  //   delegationManager: "0xA44151489861Fe9e3055d95adC98FbD462B948e7",
-  //   rewardsCoordinator: "0xAcc1fb458a1317E886dB376Fc8141540537E68fE",
-  //   withdrawalDelayBlocks: 20,
-  //   ratioErr: 3n,
-  //   transactErr: 5n,
-  //   // blockNumber: 17453047,
-  //   impersonateStaker: async (staker, iVault, asset, assetPool) => {
-  //     const donor = await impersonateWithEth("0x66b25CFe6B9F0e61Bd80c4847225Baf4EE6Ba0A2", toWei(1));
-  //     await asset.connect(donor).transfer(staker.address, toWei(1000));
-  //     const balanceAfter = await asset.balanceOf(staker.address);
-  //     await asset.connect(staker).approve(await iVault.getAddress(), balanceAfter);
-  //     return staker;
-  //   },
-  // },
 ];
 
 //https://holesky.eigenlayer.xyz/restake
