@@ -24,11 +24,8 @@ contract DelegationManager is IDelegationManager {
         IERC20[][] calldata tokens,
         bool[] calldata receiveAsTokens
     ) external override {
-        console.logString("completeQueuedWithdrawals");
         for (uint256 i = 0; i < withdrawals.length; i++) {
-            console.logAddress(withdrawals[i].withdrawer);
-            console.logUint(withdrawals[i].shares[0]);
-            console.logBool(tokens[i][0].transfer(withdrawals[i].withdrawer, withdrawals[i].shares[0]));
+            tokens[i][0].transfer(withdrawals[i].withdrawer, withdrawals[i].shares[0]);
         }
     }
 

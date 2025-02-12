@@ -464,6 +464,9 @@ assets.forEach(function(a) {
       let withdrawals = await iVault.isAbleToRedeem(staker.address);
       console.log(`Available withdrawals: `, withdrawals);
 
+      console.log(await asset.getAddress());
+      console.log(nodeOperatorToRestaker.get(nodeOperators[0]));
+
       tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
       await tx.wait();
     });
