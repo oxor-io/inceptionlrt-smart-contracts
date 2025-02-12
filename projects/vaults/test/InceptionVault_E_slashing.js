@@ -432,7 +432,7 @@ assets.forEach(function(a) {
       }
     });
 
-    it("One slashed withdrawal", async function() {
+    it("1 half slashed withdrawal", async function() {
       // make first deposit 10 eth
       let deposited = toWei(10);
       let tx = await iVault4626.connect(staker).deposit(deposited, staker2.address);
@@ -451,7 +451,7 @@ assets.forEach(function(a) {
       console.log("delegateToOperator()");
       console.log("-----");
       console.log("ratio after delegate", await calculateRatio(iVault, iToken));
-      console.log("iVault balance after delegate : ", await asset.balanceOf(iVault.address));
+      console.log("vault balance after delegate: ", await asset.balanceOf(iVault.address));
       console.log("-----");
 
       // withdraw 5 eth
@@ -461,7 +461,7 @@ assets.forEach(function(a) {
       console.log("withdraw()");
       console.log("-----");
       console.log("ratio after withdraw", await calculateRatio(iVault, iToken));
-      console.log("iVault balance after withdraw : ", await asset.balanceOf(iVault.address));
+      console.log("vault balance after withdraw : ", await asset.balanceOf(iVault.address));
       console.log("-----");
 
       // undelegate 5 eth and queue withdrawal
@@ -471,7 +471,7 @@ assets.forEach(function(a) {
       console.log("-----");
       let ratio = await calculateRatio(iVault, iToken);
       console.log("ratio after withdrawFromELAndClaim", ratio);
-      console.log("iVault balance after withdrawFromELAndClaim : ", await asset.balanceOf(iVault.address));
+      console.log("vault balance after withdrawFromELAndClaim : ", await asset.balanceOf(iVault.address));
       console.log("-----");
 
       await ratioFeed.updateRatioBatch([iToken.address], [ratio]);
@@ -483,7 +483,131 @@ assets.forEach(function(a) {
       console.log("redeem()");
       console.log("-----");
       console.log("ratio after redeem", await calculateRatio(iVault, iToken));
-      console.log("iVault balance after redeem : ", await asset.balanceOf(iVault.address));
+      console.log("vault balance after redeem : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+    });
+
+    it("1 all slashed withdrawal", async function() {
+      // make first deposit 10 eth
+      let deposited = toWei(10);
+      let tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
+      await tx.wait();
+
+      console.log("deposited()");
+
+      // // delegate all eth
+      await iVault.delegateToOperator(nodeOperators[0], toWei(10));
+
+      console.log("delegateToOperator()");
+      console.log("-----");
+      console.log("ratio after delegate", await calculateRatio(iVault, iToken));
+      console.log("vault balance after delegate: ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      // withdraw eth
+      tx = await iVault4626.connect(staker).withdraw(toWei(10), staker.address);
+      await tx.wait();
+
+      console.log("withdraw()");
+      console.log("-----");
+      console.log("ratio after withdraw", await calculateRatio(iVault, iToken));
+      console.log("vault balance after withdraw : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      // undelegate eth and queue withdrawal
+      await iVault.withdrawFromELAndClaim(nodeOperators[0], toWei(10));
+
+      console.log("withdrawFromELAndClaim()");
+      console.log("-----");
+      let ratio = await calculateRatio(iVault, iToken);
+      console.log("ratio after withdrawFromELAndClaim", ratio);
+      console.log("vault balance after withdrawFromELAndClaim : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      await ratioFeed.updateRatioBatch([iToken.address], [ratio]);
+
+      // redeem eth
+      tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
+      await tx.wait();
+
+      console.log("redeem()");
+      console.log("-----");
+      console.log("ratio after redeem", await calculateRatio(iVault, iToken));
+      console.log("vault balance after redeem : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+    });
+
+    it("3 slashed withdrawal", async function() {
+      // make first deposit 10 eth
+      let deposited = toWei(10);
+      let tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
+      await tx.wait();
+
+      // make second deposit 10 eth
+      deposited = toWei(10);
+      tx = await iVault4626.connect(staker2).deposit(deposited, staker2.address);
+      await tx.wait();
+
+      // make third deposit 10 eth
+      deposited = toWei(10);
+      tx = await iVault4626.connect(staker3).deposit(deposited, staker3.address);
+      await tx.wait();
+
+      console.log("deposited()");
+
+      // // delegate all eth
+      await iVault.delegateToOperator(nodeOperators[0], toWei(30));
+      console.log("delegateToOperator()");
+
+      console.log("-----");
+      console.log("ratio after delegate", await calculateRatio(iVault, iToken));
+      console.log("vault balance after delegate: ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      // withdraw eth
+      tx = await iVault4626.connect(staker).withdraw(toWei(10), staker.address);
+      await tx.wait();
+
+      tx = await iVault4626.connect(staker2).withdraw(toWei(10), staker2.address);
+      await tx.wait();
+
+      tx = await iVault4626.connect(staker3).withdraw(toWei(10), staker3.address);
+      await tx.wait();
+
+      console.log("withdraw()");
+      console.log("-----");
+      console.log("ratio after withdraw", await calculateRatio(iVault, iToken));
+      console.log("vault balance after withdraw : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      // undelegate 30 eth and queue withdrawal
+      await iVault.withdrawFromELAndClaim(nodeOperators[0], toWei(30));
+      console.log("withdrawFromELAndClaim()");
+
+      console.log("-----");
+      let ratio = await calculateRatio(iVault, iToken);
+      console.log("ratio after withdrawFromELAndClaim", ratio);
+      console.log("vault balance after withdrawFromELAndClaim : ", await asset.balanceOf(iVault.address));
+      console.log("-----");
+
+      await ratioFeed.updateRatioBatch([iToken.address], [ratio]);
+
+      // redeem 10 eth
+      tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
+      await tx.wait();
+
+      // redeem 10 eth
+      tx = await iVault4626.connect(iVaultOperator).redeem(staker2.address);
+      await tx.wait();
+
+      // redeem 10 eth
+      tx = await iVault4626.connect(iVaultOperator).redeem(staker3.address);
+      await tx.wait();
+
+      console.log("redeem()");
+      console.log("-----");
+      console.log("ratio after redeem", await calculateRatio(iVault, iToken));
+      console.log("vault balance after redeem : ", await asset.balanceOf(iVault.address));
       console.log("-----");
     });
   });

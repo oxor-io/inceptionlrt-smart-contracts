@@ -28,8 +28,14 @@ contract DelegationManager is IDelegationManager {
                 );
 
                 // apply slash
-                shareManager.burnShares(withdrawals[i].strategies[j], slashedAmount);
-                shareManager.removeDepositShares(withdrawals[i].staker, withdrawals[i].strategies[j], slashedAmount);
+                if (slashedAmount > 0) {
+                    shareManager.burnShares(withdrawals[i].strategies[j], slashedAmount);
+                    shareManager.removeDepositShares(
+                        withdrawals[i].staker,
+                        withdrawals[i].strategies[j],
+                        slashedAmount
+                    );
+                }
             }
         }
     }
@@ -80,8 +86,11 @@ contract DelegationManager is IDelegationManager {
         withdrawableShares = new uint256[](strategies.length);
         depositShares = new uint256[](strategies.length);
 
-        withdrawableShares[0] = 10 * 1e18;
-        depositShares[0] = 10 * 1e18;
+        for (uint256 i = 0; i < strategies.length; ++i) {
+            IShareManager shareManager = _getShareManager(strategies[i]);
+            depositShares[i] = shareManager.stakerDepositShares(staker, strategies[i]);
+            withdrawableShares[i] = depositShares[i];
+        }
 
         return (withdrawableShares, depositShares);
     }
