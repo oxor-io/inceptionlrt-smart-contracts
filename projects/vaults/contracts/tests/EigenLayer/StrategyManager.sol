@@ -19,8 +19,6 @@ contract StrategyManager is IStrategyManager {
         IERC20 token,
         uint256 amount
     ) external returns (uint256 shares) {
-        console.logString("depositIntoStrategy");
-        console.logAddress(delegationManager);
         token.transferFrom(msg.sender, delegationManager, amount);
         return amount;
     }
