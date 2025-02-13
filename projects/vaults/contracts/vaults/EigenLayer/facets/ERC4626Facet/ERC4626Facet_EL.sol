@@ -224,8 +224,12 @@ contract ERC4626Facet_EL is InceptionVaultStorage_EL {
             // slashed
             uint256 amountAfterClaim = convertToAssets(request.iShares);
             if (amountAfterClaim < amount) {
+                _pendingWithdrawalAmount -= amount - amountAfterClaim;
+                if (_pendingWithdrawalAmount <= 2) {
+                    _pendingWithdrawalAmount = 0;
+                }
+
                 amount = amountAfterClaim;
-                _pendingWithdrawalAmount -= request.amount - amountAfterClaim;
             }
 
             redeemedAmount += amount;
