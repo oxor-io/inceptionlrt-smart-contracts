@@ -197,10 +197,6 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
 
         IStrategy[] memory strategies = new IStrategy[](1);
         strategies[0] = strategy;
-        (uint256[] memory withdrawableShares, ) = delegationManager
-            .getWithdrawableShares(staker, strategies);
-        if (shares > withdrawableShares[0]) revert WithdrawableSharesExceeded();
-
         amount = strategy.sharesToUnderlyingView(shares);
         _pendingWithdrawalAmount += amount;
 
@@ -252,6 +248,9 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
 
         emit WithdrawalClaimed(withdrawnAmount);
 
+        uint256 slashed = expectedWithdrawalsAmount - withdrawnAmount;
+        totalSlashed += slashed;
+
         _pendingWithdrawalAmount = _pendingWithdrawalAmount < withdrawnAmount
             ? 0
             : _pendingWithdrawalAmount - withdrawnAmount;
@@ -260,7 +259,7 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
             _pendingWithdrawalAmount = 0;
         }
 
-        _updateEpoch(availableBalance + withdrawnAmount, expectedWithdrawalsAmount - withdrawnAmount);
+        _updateEpoch(availableBalance + withdrawnAmount, slashed);
     }
 
     function _claimCompletedWithdrawalsForVault(
