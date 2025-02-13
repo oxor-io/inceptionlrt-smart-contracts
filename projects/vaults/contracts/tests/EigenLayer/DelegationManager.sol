@@ -3,9 +3,16 @@ pragma solidity ^0.8.20;
 
 import "../../interfaces/eigenlayer-vault/eigen-core/IDelegationManager.sol";
 import "../../interfaces/eigenlayer-vault/eigen-core/IShareManager.sol";
+import {DepositScalingFactor} from "./SlashingLib.sol";
 import "hardhat/console.sol";
 
 contract DelegationManager is IDelegationManager {
+    uint256 public scalingFactor = 1;
+
+    function applySlash(uint256 factor) external {
+        scalingFactor = factor;
+    }
+
     function completeQueuedWithdrawals(
         IDelegationManager.Withdrawal[] calldata withdrawals,
         IERC20[][] calldata tokens,
@@ -16,8 +23,8 @@ contract DelegationManager is IDelegationManager {
                 IShareManager shareManager = _getShareManager(withdrawals[i].strategies[j]);
 
                 uint256 shares = shareManager.stakerDepositShares(withdrawals[i].staker, withdrawals[i].strategies[j]);
-                uint256 slashedAmountToWithdraw = withdrawals[i].shares[j] / 2;
-                uint256 slashedAmount = shares / 2;
+                uint256 slashedAmountToWithdraw = withdrawals[i].shares[j] / scalingFactor;
+                uint256 slashedAmount = shares / scalingFactor;
 
                 // apply slashed withdraw
                 shareManager.withdrawSharesAsTokens(
@@ -28,14 +35,9 @@ contract DelegationManager is IDelegationManager {
                 );
 
                 // apply slash
-                if (slashedAmount > 0) {
-                    shareManager.burnShares(withdrawals[i].strategies[j], slashedAmount);
-                    shareManager.removeDepositShares(
-                        withdrawals[i].staker,
-                        withdrawals[i].strategies[j],
-                        slashedAmount
-                    );
-                }
+//                if (slashedAmount > 0) {
+//                    shareManager.burnShares(withdrawals[i].strategies[j], slashedAmount);
+//                }
             }
         }
     }
@@ -89,7 +91,17 @@ contract DelegationManager is IDelegationManager {
         for (uint256 i = 0; i < strategies.length; ++i) {
             IShareManager shareManager = _getShareManager(strategies[i]);
             depositShares[i] = shareManager.stakerDepositShares(staker, strategies[i]);
-            withdrawableShares[i] = depositShares[i];
+
+            withdrawableShares[i] = 0;
+            if (depositShares[i] > 0) {
+//                console.logString("getWithdrawableShares{");
+//                console.logUint(depositShares[i]);
+//                console.logUint(withdrawableShares[i]);
+//                console.logString("}");
+
+                withdrawableShares[i] = depositShares[i] / scalingFactor;
+            }
+
         }
 
         return (withdrawableShares, depositShares);
