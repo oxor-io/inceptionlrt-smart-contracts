@@ -248,9 +248,6 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
 
         emit WithdrawalClaimed(withdrawnAmount);
 
-        uint256 slashed = expectedWithdrawalsAmount - withdrawnAmount;
-        totalSlashed += slashed;
-
         _pendingWithdrawalAmount = _pendingWithdrawalAmount < withdrawnAmount
             ? 0
             : _pendingWithdrawalAmount - withdrawnAmount;
@@ -259,7 +256,7 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
             _pendingWithdrawalAmount = 0;
         }
 
-        _updateEpoch(availableBalance + withdrawnAmount, slashed);
+        _updateEpoch(availableBalance + withdrawnAmount, expectedWithdrawalsAmount - withdrawnAmount);
     }
 
     function _claimCompletedWithdrawalsForVault(

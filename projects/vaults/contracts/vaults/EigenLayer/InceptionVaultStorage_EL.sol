@@ -20,8 +20,6 @@ import {IStrategyManager, IStrategy} from "../../interfaces/eigenlayer-vault/eig
 import {Convert} from "../../lib/Convert.sol";
 import {InceptionLibrary} from "../../lib/InceptionLibrary.sol";
 
-import "hardhat/console.sol";
-
 /**
  * @title InceptionVaultStorage_EL
  * @author The InceptionLRT team
@@ -145,12 +143,6 @@ contract InceptionVaultStorage_EL is
      * @return The total assets delegated, held in the vault, and pending withdrawal.
      */
     function getTotalDeposited() public view returns (uint256) {
-//        console.logString("<--->");
-//        console.logUint(getTotalDelegated());
-//        console.logUint(totalAssets());
-//        console.logUint(_pendingWithdrawalAmount);
-//        console.logString("<--->");
-
         return
             getTotalDelegated() +
             totalAssets() +
@@ -163,12 +155,23 @@ contract InceptionVaultStorage_EL is
      * @return total The total delegated amount.
      */
     function getTotalDelegated() public view returns (uint256 total) {
-        uint256 stakersNum = restakers.length;
-        for (uint256 i = 0; i < stakersNum; ++i) {
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = strategy;
+
+        for (uint256 i = 0; i < restakers.length; ++i) {
             if (restakers[i] == address(0)) continue;
-            total += strategy.userUnderlyingView(restakers[i]);
+            (uint256[] memory withdrawableShares,) = delegationManager.getWithdrawableShares(
+                restakers[i], strategies
+            );
+
+            total += withdrawableShares[0];
         }
-        return total + strategy.userUnderlyingView(address(this));
+
+        (uint256[] memory withdrawableShares,) = delegationManager.getWithdrawableShares(
+            address(this), strategies
+        );
+
+        return total + withdrawableShares[0];
     }
 
     /**
