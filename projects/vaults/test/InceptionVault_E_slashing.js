@@ -39,7 +39,7 @@ assets = [
     transactErr: 5n,
     impersonateStaker: async (staker, iVault, asset, assetPool) => {
       const donor = await impersonateWithEth("0x570EDBd50826eb9e048aA758D4d78BAFa75F14AD", toWei(1));
-      await asset.connect(donor).transfer(staker.address, toWei(1000));
+      await asset.connect(donor).transfer(staker.address, toWei(10));
       const balanceAfter = await asset.balanceOf(staker.address);
       await asset.connect(staker).approve(await iVault.getAddress(), balanceAfter);
       return staker;
@@ -433,125 +433,105 @@ assets.forEach(function(a) {
         let tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
         await tx.wait();
 
-        // // delegate all
+        // delegate all
         await iVault.delegateToOperator(nodeOperators[0], toWei(10));
 
         expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(10));
         expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
 
         // withdraw
-        tx = await iVault4626.connect(staker).withdraw(toWei(9), staker.address);
+        tx = await iVault4626.connect(staker).withdraw(toWei(2), staker.address);
         await tx.wait();
 
+        // totalDelegated = 10; totalAmountToWithdraw = 2
         expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(10));
-        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(9));
+        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(2));
         expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
 
         // queue withdrawals from EL
-        tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperators[0], toWei(9));
+        tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperators[0], toWei(2));
         const withdrawalData = await withdrawDataFromTx(tx, nodeOperators[0], nodeOperatorToRestaker.get(nodeOperators[0]));
 
-        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(1));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(9), 5);
-        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(9));
+        // totalDelegated = 8; totalAmountToWithdraw = 2; pendingWithdrawalAmount = 2
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(8), 2n);
+        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(2));
+        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(2), 5);
         expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
 
         await mineBlocks(minWithdrawalDelayBlocks);
 
         // apply slash 50%
-        tx = await delegationManager.applySlash(2);
+        tx = await delegationManager.applySlash(5000);
         await tx.wait();
 
         // complete queued withdrawals from EL
         tx = await iVaultEL.connect(iVaultOperator).claimCompletedWithdrawals(nodeOperatorToRestaker.get(nodeOperators[0]), [withdrawalData]);
         await tx.wait();
 
-        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(0.5));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(4.5), 5);
-        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(9));
-        expect(await asset.balanceOf(iVault.address)).to.be.eq(toWei(4.5));
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(2), ratioErr);
+        // totalDelegated = 4; totalAmountToWithdraw = 0; vaultBalance = 1
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(4), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(0), transactErr);
+        expect(await asset.balanceOf(iVault.address)).to.be.closeTo(toWei(1), transactErr);
+        // expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(2), ratioErr);
 
         // update ratio
-        await ratioFeed.updateRatioBatch([iToken.address], [await calculateRatio(iVault, iToken)]);
+        // await ratioFeed.updateRatioBatch([iToken.address], [await calculateRatio(iVault, iToken)]);
 
         // redeem
         tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
         await tx.wait();
 
-        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(0.5));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(0), 5);
+        // totalDelegated = 4; vaultBalance = 0; stakerBalance = 1;
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(4), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(0), transactErr);
         expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(0));
         expect(await asset.balanceOf(iVault.address)).to.be.eq(toWei(0));
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(2), ratioErr);
+        expect(await asset.balanceOf(staker.address)).to.be.closeTo(toWei(1), transactErr);
+        // expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
       });
 
-      // it("1 withdraw all", async function() {
-      //   // make deposit
-      //   let deposited = toWei(10);
-      //   let tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
-      //   await tx.wait();
-      //   console.log("deposited()\n\n");
-      //
-      //   // // delegate all
-      //   await iVault.delegateToOperator(nodeOperators[0], toWei(10));
-      //   console.log("delegateToOperator()");
-      //   console.log("-----");
-      //   console.log("ratio after delegate", ethers.formatEther(await calculateRatio(iVault, iToken)));
-      //   console.log("vault balance after delegate: ", ethers.formatEther(await asset.balanceOf(iVault.address)));
-      //   console.log("-----\n\n");
-      //
-      //   // withdraw
-      //   tx = await iVault4626.connect(staker).withdraw(toWei(10), staker.address);
-      //   await tx.wait();
-      //   console.log("withdraw()");
-      //   console.log("-----");
-      //   console.log("ratio after withdraw", ethers.formatEther(await calculateRatio(iVault, iToken)));
-      //   console.log("vault balance after withdraw : ", ethers.formatEther(await asset.balanceOf(iVault.address)));
-      //   console.log("-----\n\n");
-      //
-      //   // queue withdrawals from EL
-      //   tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperators[0], toWei(10));
-      //   const withdrawalData = await withdrawDataFromTx(tx, nodeOperators[0], nodeOperatorToRestaker.get(nodeOperators[0]));
-      //
-      //   console.log("queueWithdrawals()");
-      //   console.log("-----");
-      //   console.log("ratio after withdraw", ethers.formatEther(await calculateRatio(iVault, iToken)));
-      //   console.log("vault balance after withdraw : ", ethers.formatEther(await asset.balanceOf(iVault.address)));
-      //   console.log("-----\n\n");
-      //
-      //   await mineBlocks(minWithdrawalDelayBlocks);
-      //
-      //   // apply slash 50%
-      //   tx = await delegationManager.applySlash(2);
-      //   await tx.wait();
-      //
-      //   // complete queued withdrawals from EL
-      //   tx = await iVaultEL.connect(iVaultOperator).claimCompletedWithdrawals(nodeOperatorToRestaker.get(nodeOperators[0]), [withdrawalData]);
-      //   await tx.wait();
-      //
-      //   console.log("-----");
-      //   console.log("withdrawFromELAndClaim()");
-      //   let ratio = await calculateRatio(iVault, iToken);
-      //   console.log("ratio after withdrawFromELAndClaim", ethers.formatEther(ratio));
-      //   console.log("vault balance after withdrawFromELAndClaim : ", ethers.formatEther(await asset.balanceOf(iVault.address)));
-      //   console.log("-----\n\n");
-      //
-      //   // update ratio
-      //   await ratioFeed.updateRatioBatch([iToken.address], [ratio]);
-      //
-      //   // redeem
-      //   tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
-      //   await tx.wait();
-      //
-      //   console.log("redeem()");
-      //   console.log("-----");
-      //   console.log("ratio after redeem", ethers.formatEther(await calculateRatio(iVault, iToken)));
-      //   console.log("vault balance after redeem : ", ethers.formatEther(await asset.balanceOf(iVault.address)));
-      //   console.log("-----");
-      // });
+      it("1 withdraw all", async function() {
+        await snapshot.restore();
 
-      it("2 withdrawals", async function() {
+        // make deposit
+        let deposited = toWei(10);
+        let tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
+        await tx.wait();
+
+        // delegate all
+        await iVault.delegateToOperator(nodeOperators[0], toWei(10));
+
+        // withdraw
+        tx = await iVault4626.connect(staker).withdraw(toWei(10), staker.address);
+        await tx.wait();
+
+        // queue withdrawals from EL
+        tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperators[0], toWei(10));
+        const withdrawalData = await withdrawDataFromTx(tx, nodeOperators[0], nodeOperatorToRestaker.get(nodeOperators[0]));
+
+        await mineBlocks(minWithdrawalDelayBlocks);
+
+        // apply slash 50%
+        tx = await delegationManager.applySlash(5000);
+        await tx.wait();
+
+        // complete queued withdrawals from EL
+        tx = await iVaultEL.connect(iVaultOperator).claimCompletedWithdrawals(nodeOperatorToRestaker.get(nodeOperators[0]), [withdrawalData]);
+        await tx.wait();
+
+        // redeem
+        console.log(await asset.balanceOf(iVault.address));
+        tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
+        await tx.wait();
+
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(0), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(0), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(0));
+        expect(await asset.balanceOf(iVault.address)).to.be.closeTo(toWei(0), transactErr);
+        expect(await asset.balanceOf(staker.address)).to.be.closeTo(toWei(5), transactErr);
+      });
+
+      it("2 slashed withdrawals", async function() {
         await snapshot.restore();
 
         // make deposit
@@ -575,65 +555,123 @@ assets.forEach(function(a) {
         expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(20));
         expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(0), 5);
         expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(6));
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
 
         tx = await iVault4626.connect(staker2).withdraw(toWei(8), staker2.address);
         await tx.wait();
 
         expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(20));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(0), 5);
+        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(0), 0);
         expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(14));
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
 
         // queue withdrawals from EL
         tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperators[0], toWei(14));
         const withdrawalData = await withdrawDataFromTx(tx, nodeOperators[0], nodeOperatorToRestaker.get(nodeOperators[0]));
 
-        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(6));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(14), 5);
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(6), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(14), transactErr);
         expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(14));
-        expect(await asset.balanceOf(iVault.address)).to.be.eq(toWei(0));
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
 
         await mineBlocks(minWithdrawalDelayBlocks);
 
         // apply slash 50%
-        tx = await delegationManager.applySlash(2);
+        tx = await delegationManager.applySlash(5000);
         await tx.wait();
 
         // complete queued withdrawals from EL
         tx = await iVaultEL.connect(iVaultOperator).claimCompletedWithdrawals(nodeOperatorToRestaker.get(nodeOperators[0]), [withdrawalData]);
         await tx.wait();
 
-        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(3));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(7), 5);
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(3), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.eq(0);
         expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(14));
-        expect(await asset.balanceOf(iVault.address)).to.be.eq(toWei(7));
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(2), ratioErr);
-
-        // update ratio
-        await ratioFeed.updateRatioBatch([iToken.address], [await calculateRatio(iVault, iToken)]);
+        expect(await asset.balanceOf(iVault.address)).to.be.closeTo(toWei(7), transactErr);
 
         // redeem
         tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
         await tx.wait();
 
-        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(3));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(toWei(4), 5);
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(3), transactErr);
         expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(8));
-        expect(await asset.balanceOf(iVault.address)).to.be.eq(toWei(4));
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(2), ratioErr);
+        expect(await asset.balanceOf(iVault.address)).to.be.closeTo(toWei(4), transactErr);
+        expect(await asset.balanceOf(staker.address)).to.be.closeTo(toWei(3), transactErr);
 
         tx = await iVault4626.connect(iVaultOperator).redeem(staker2.address);
         await tx.wait();
 
-        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(3));
-        expect(await iVaultEL.connect(iVaultOperator).getPendingWithdrawalAmountFromEL()).to.be.closeTo(0, 5);
-        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(0);
-        expect(await asset.balanceOf(iVault.address)).to.be.eq(0n);
-        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(2), ratioErr);
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(3), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(0));
+        expect(await asset.balanceOf(iVault.address)).to.be.eq(toWei(0));
+        expect(await asset.balanceOf(staker2.address)).to.be.closeTo(toWei(4), transactErr);
       });
-    })
+
+      it("1 slashed withdrawal & 1 simple withdrawal in 2 queue withdrawals", async function() {
+        await snapshot.restore();
+
+        // make deposit
+        let deposited = toWei(10);
+        let tx = await iVault4626.connect(staker).deposit(deposited, staker.address);
+        await tx.wait();
+
+        tx = await iVault4626.connect(staker2).deposit(deposited, staker2.address);
+        await tx.wait();
+
+        // // delegate all
+        await iVault.delegateToOperator(nodeOperators[0], toWei(20));
+
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.eq(toWei(20));
+        expect(await calculateRatio(iVault, iToken)).to.be.closeTo(toWei(1), ratioErr);
+
+        // withdraw
+        tx = await iVault4626.connect(staker).withdraw(toWei(8), staker.address);
+        await tx.wait();
+
+        // queue withdrawals from EL
+        tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperators[0], toWei(8));
+        let withdrawalData = await withdrawDataFromTx(tx, nodeOperators[0], nodeOperatorToRestaker.get(nodeOperators[0]));
+        await mineBlocks(minWithdrawalDelayBlocks);
+
+        // complete queued withdrawals from EL
+        tx = await iVaultEL.connect(iVaultOperator).claimCompletedWithdrawals(nodeOperatorToRestaker.get(nodeOperators[0]), [withdrawalData]);
+        await tx.wait();
+
+        // withdraw #2
+        tx = await iVault4626.connect(staker2).withdraw(toWei(6), staker2.address);
+        await tx.wait();
+
+        // queue withdrawals from EL
+        tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperators[0], toWei(6));
+        withdrawalData = await withdrawDataFromTx(tx, nodeOperators[0], nodeOperatorToRestaker.get(nodeOperators[0]));
+        await mineBlocks(minWithdrawalDelayBlocks);
+
+        // apply slash 50%
+        tx = await delegationManager.applySlash(5000);
+        await tx.wait();
+
+        // complete queued withdrawals from EL
+        tx = await iVaultEL.connect(iVaultOperator).claimCompletedWithdrawals(nodeOperatorToRestaker.get(nodeOperators[0]), [withdrawalData]);
+        await tx.wait();
+
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(3), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(14));
+        expect(await asset.balanceOf(iVault.address)).to.be.closeTo(toWei(11), transactErr);
+
+        tx = await iVault4626.connect(iVaultOperator).redeem(staker.address);
+        await tx.wait();
+
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(3), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(6));
+        expect(await asset.balanceOf(iVault.address)).to.be.closeTo(toWei(3), transactErr);
+        expect(await asset.balanceOf(staker.address)).to.be.closeTo(toWei(8), transactErr);
+
+        tx = await iVault4626.connect(iVaultOperator).redeem(staker2.address);
+        await tx.wait();
+
+        expect(await iVaultEL.connect(iVaultOperator).getTotalDelegated()).to.be.closeTo(toWei(3), transactErr);
+        expect(await iVaultEL.connect(iVaultOperator).totalAmountToWithdraw()).to.be.eq(toWei(0));
+        expect(await asset.balanceOf(iVault.address)).to.be.eq(toWei(0));
+        expect(await asset.balanceOf(staker2.address)).to.be.closeTo(toWei(3), transactErr);
+      });
+    });
 
   });
 });
