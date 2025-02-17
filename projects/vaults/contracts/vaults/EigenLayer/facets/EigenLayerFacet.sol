@@ -181,15 +181,8 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
         if (staker == address(0)) revert OperatorNotRegistered();
         if (staker == _MOCK_ADDRESS) revert NullParams();
 
-        // todo: use require for amount or calculate amount
-
-        uint256 undelegateAmount;
-        for (uint256 i = epoch; i < claimerSlashedWithdrawalsQueue.length; i++) {
-            undelegateAmount += claimerSlashedWithdrawalsQueue[i].amount;
-        }
-
         IInceptionEigenRestaker(staker).withdrawFromEL(
-            _undelegate(undelegateAmount, staker)
+            _undelegate(withdrawalAmountToBeUndelegated, staker)
         );
     }
 
@@ -211,6 +204,7 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
 
         withdrawalNonceToELNonce[withdrawalNonce] = nonce;
         elNonceToWithdrawalNonce[nonce] = withdrawalNonce;
+        withdrawalAmountToBeUndelegated = 0;
         withdrawalNonce++;
 
         emit StartWithdrawal(

@@ -117,11 +117,11 @@ contract InceptionVaultStorage_EL is
 
     mapping(bytes4 => FuncData) internal _selectorToTarget;
 
-    uint256 public pendingSlashed;
     SlashedWithdrawal[] public claimerSlashedWithdrawalsQueue;
     mapping(address => SlashedWithdrawal) internal _claimerSlashedWithdrawals;
 
     uint256 internal withdrawalNonce;
+    uint256 internal withdrawalAmountToBeUndelegated;
     mapping(uint256 => uint256) internal withdrawalNonceToELNonce;
     mapping(uint256 => uint256) internal elNonceToWithdrawalNonce;
     mapping(uint256 => uint256[2]) internal slashedWithdrawalWads;

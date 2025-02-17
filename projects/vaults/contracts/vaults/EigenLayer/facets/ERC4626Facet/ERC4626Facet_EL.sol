@@ -119,6 +119,7 @@ contract ERC4626Facet_EL is InceptionVaultStorage_EL {
 
         // update global state and claimer's state
         totalAmountToWithdraw += amount;
+        withdrawalAmountToBeUndelegated += _getAssetReceivedAmount(amount);
         SlashedWithdrawal storage genRequest = _claimerSlashedWithdrawals[receiver];
         genRequest.amount += _getAssetReceivedAmount(amount);
         claimerSlashedWithdrawalsQueue.push(
