@@ -121,6 +121,10 @@ contract InceptionVaultStorage_EL is
     SlashedWithdrawal[] public claimerSlashedWithdrawalsQueue;
     mapping(address => SlashedWithdrawal) internal _claimerSlashedWithdrawals;
 
+    uint256 internal withdrawalNonce;
+    mapping(uint256 => uint256) internal withdrawalNonceToELNonce;
+    mapping(uint256 => uint256) internal elNonceToWithdrawalNonce;
+    mapping(uint256 => uint256[2]) internal slashedWithdrawalWads;
 
     /**
      * @notice Initializes the Inception Assets Handler

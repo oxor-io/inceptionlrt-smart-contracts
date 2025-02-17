@@ -163,5 +163,6 @@ interface IInceptionVault_EL {
         address receiver;
         uint256 amount;
         uint256 iShares;
+        uint256 nonce;
     }
 }

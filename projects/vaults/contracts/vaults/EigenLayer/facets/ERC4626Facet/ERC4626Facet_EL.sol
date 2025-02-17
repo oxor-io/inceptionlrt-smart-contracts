@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
+import "../../../../lib/SlashingLib.sol";
 import "../../InceptionVaultStorage_EL.sol";
 
 contract ERC4626Facet_EL is InceptionVaultStorage_EL {
+    using SlashingLib for *;
+
     function __beforeDeposit(address receiver, uint256 amount) internal view {
         if (receiver == address(0)) revert NullParams();
         if (amount < minAmount) revert LowerMinAmount(minAmount);
@@ -123,7 +126,8 @@ contract ERC4626Facet_EL is InceptionVaultStorage_EL {
                 epoch: claimerSlashedWithdrawalsQueue.length,
                 receiver: receiver,
                 amount: _getAssetReceivedAmount(amount),
-                iShares: iShares
+                iShares: iShares,
+                nonce: withdrawalNonce
             })
         );
 
@@ -222,14 +226,9 @@ contract ERC4626Facet_EL is InceptionVaultStorage_EL {
             redeemedWithdrawals[i] = withdrawalNum;
 
             // slashed
-            uint256 amountAfterClaim = convertToAssets(request.iShares);
-            if (amountAfterClaim < amount) {
-                _pendingWithdrawalAmount -= amount - amountAfterClaim;
-                if (_pendingWithdrawalAmount <= 2) {
-                    _pendingWithdrawalAmount = 0;
-                }
-
-                amount = amountAfterClaim;
+            uint256[2] memory slashed = slashedWithdrawalWads[request.nonce];
+            if(slashed[0] > 0) {
+                amount -= amount.calcSlashedAmount(slashed[0], slashed[1]);
             }
 
             redeemedAmount += amount;

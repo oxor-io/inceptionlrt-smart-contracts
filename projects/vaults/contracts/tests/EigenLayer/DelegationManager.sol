@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "../../interfaces/eigenlayer-vault/eigen-core/IDelegationManager.sol";
 import "../../interfaces/eigenlayer-vault/eigen-core/IShareManager.sol";
-import {DepositScalingFactor} from "./SlashingLib.sol";
 import "hardhat/console.sol";
 
 contract DelegationManager is IDelegationManager {
@@ -23,8 +22,11 @@ contract DelegationManager is IDelegationManager {
                 IShareManager shareManager = _getShareManager(withdrawals[i].strategies[j]);
 
                 uint256 shares = shareManager.stakerDepositShares(withdrawals[i].staker, withdrawals[i].strategies[j]);
-                uint256 slashedAmountToWithdraw = withdrawals[i].shares[j] / scalingFactor;
-                uint256 slashedAmount = shares / scalingFactor;
+                uint256 slashedAmountToWithdraw = withdrawals[i].shares[j];
+
+                if (scalingFactor > 1) {
+                    slashedAmountToWithdraw = (slashedAmountToWithdraw * scalingFactor) / 10000;
+                }
 
                 // apply slashed withdraw
                 shareManager.withdrawSharesAsTokens(
@@ -33,11 +35,6 @@ contract DelegationManager is IDelegationManager {
                     tokens[i][j],
                     slashedAmountToWithdraw
                 );
-
-                // apply slash
-//                if (slashedAmount > 0) {
-//                    shareManager.burnShares(withdrawals[i].strategies[j], slashedAmount);
-//                }
             }
         }
     }
@@ -94,12 +91,10 @@ contract DelegationManager is IDelegationManager {
 
             withdrawableShares[i] = 0;
             if (depositShares[i] > 0) {
-//                console.logString("getWithdrawableShares{");
-//                console.logUint(depositShares[i]);
-//                console.logUint(withdrawableShares[i]);
-//                console.logString("}");
-
-                withdrawableShares[i] = depositShares[i] / scalingFactor;
+                withdrawableShares[i] = depositShares[i];
+                if (scalingFactor > 1) {
+                    withdrawableShares[i] = depositShares[i] * scalingFactor / 10000;
+                }
             }
 
         }

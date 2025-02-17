@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
-
+import "../../../lib/SlashingLib.sol";
 import "../InceptionVaultStorage_EL.sol";
+import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 
 /**
  * @title The EigenLayerFacet contract
  * @author The InceptionLRT team
  */
 contract EigenLayerFacet is InceptionVaultStorage_EL {
+    using SlashingLib for *;
+
     constructor() payable {}
 
     /**
@@ -133,7 +135,7 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
 
     /// @dev deposits asset to the corresponding strategy
     function _depositAssetIntoStrategy(address restaker, uint256 amount)
-        internal
+    internal
     {
         _asset.approve(restaker, amount);
         IInceptionEigenRestaker(restaker).depositAssetIntoStrategy(amount);
@@ -154,9 +156,9 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
         sharesToWithdraw[0] = _undelegate(amount, staker);
         strategies[0] = strategy;
         IDelegationManager.QueuedWithdrawalParams[]
-            memory withdrawals = new IDelegationManager.QueuedWithdrawalParams[](
-                1
-            );
+        memory withdrawals = new IDelegationManager.QueuedWithdrawalParams[](
+            1
+        );
 
         /// @notice from Vault
         withdrawals[0] = IDelegationManager.QueuedWithdrawalParams({
@@ -172,21 +174,28 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
      * @dev requires a specific amount to withdraw
      */
     function undelegateFrom(address elOperatorAddress, uint256 amount)
-        external
-        nonReentrant
+    external
+    nonReentrant
     {
         address staker = _operatorRestakers[elOperatorAddress];
         if (staker == address(0)) revert OperatorNotRegistered();
         if (staker == _MOCK_ADDRESS) revert NullParams();
 
+        // todo: use require for amount or calculate amount
+
+        uint256 undelegateAmount;
+        for (uint256 i = epoch; i < claimerSlashedWithdrawalsQueue.length; i++) {
+            undelegateAmount += claimerSlashedWithdrawalsQueue[i].amount;
+        }
+
         IInceptionEigenRestaker(staker).withdrawFromEL(
-            _undelegate(amount, staker)
+            _undelegate(undelegateAmount, staker)
         );
     }
 
     function _undelegate(uint256 amount, address staker)
-        internal
-        returns (uint256)
+    internal
+    returns (uint256)
     {
         uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
         uint256 totalAssetSharesInEL = strategyManager.stakerDepositShares(staker, strategy);
@@ -199,6 +208,10 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
         strategies[0] = strategy;
         amount = strategy.sharesToUnderlyingView(shares);
         _pendingWithdrawalAmount += amount;
+
+        withdrawalNonceToELNonce[withdrawalNonce] = nonce;
+        elNonceToWithdrawalNonce[nonce] = withdrawalNonce;
+        withdrawalNonce++;
 
         emit StartWithdrawal(
             staker,
@@ -219,19 +232,40 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
         address restaker,
         IDelegationManager.Withdrawal[] calldata withdrawals
     ) public nonReentrant {
-        uint256 expectedWithdrawalsAmount = __beforeClaiming(withdrawals);
+        uint256 withdrawnAmount;
 
-        uint256 withdrawalsNum = withdrawals.length;
-        IERC20[][] memory tokens = new IERC20[][](withdrawalsNum);
-        bool[] memory receiveAsTokens = new bool[](withdrawalsNum);
-
-        for (uint256 i = 0; i < withdrawalsNum; ++i) {
-            tokens[i] = new IERC20[](1);
-            tokens[i][0] = _asset;
-            receiveAsTokens[i] = true;
+        for (uint256 i = 0; i < withdrawals.length; i++) {
+            withdrawnAmount += _claimCompletedWithdrawal(restaker, withdrawals[i]);
         }
 
-        uint256 availableBalance = getFreeBalance();
+        emit WithdrawalClaimed(withdrawnAmount);
+
+        _pendingWithdrawalAmount = _pendingWithdrawalAmount < withdrawnAmount
+            ? 0
+            : _pendingWithdrawalAmount - withdrawnAmount;
+
+        if (_pendingWithdrawalAmount < 7) {
+            _pendingWithdrawalAmount = 0;
+        }
+
+        _updateEpoch(getFreeBalance() + withdrawnAmount);
+    }
+
+    function _claimCompletedWithdrawal(
+        address restaker,
+        IDelegationManager.Withdrawal calldata withdrawal
+    ) internal returns (uint256) {
+        uint256 expectedAmount = __beforeClaiming(withdrawal);
+
+        IERC20[][] memory tokens = new IERC20[][](1);
+        bool[] memory receiveAsTokens = new bool[](1);
+
+        tokens[0] = new IERC20[](1);
+        tokens[0][0] = _asset;
+        receiveAsTokens[0] = true;
+
+        IDelegationManager.Withdrawal[] memory withdrawals = new IDelegationManager.Withdrawal[](1);
+        withdrawals[0] = withdrawal;
 
         uint256 withdrawnAmount;
         if (restaker == address(this)) {
@@ -246,17 +280,12 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
                 .claimWithdrawals(withdrawals, tokens, receiveAsTokens);
         }
 
-        emit WithdrawalClaimed(withdrawnAmount);
-
-        _pendingWithdrawalAmount = _pendingWithdrawalAmount < withdrawnAmount
-            ? 0
-            : _pendingWithdrawalAmount - withdrawnAmount;
-
-        if (_pendingWithdrawalAmount < 7) {
-            _pendingWithdrawalAmount = 0;
+        // slash
+        if (expectedAmount > withdrawnAmount) {
+            slashedWithdrawalWads[elNonceToWithdrawalNonce[withdrawal.nonce]] = [expectedAmount, withdrawnAmount];
         }
 
-        _updateEpoch(availableBalance + withdrawnAmount, expectedWithdrawalsAmount - withdrawnAmount);
+        return withdrawnAmount + (expectedAmount - withdrawnAmount);
     }
 
     function _claimCompletedWithdrawalsForVault(
@@ -274,19 +303,19 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
 
         // send tokens to the vault
         uint256 withdrawnAmount = _asset.balanceOf(address(this)) -
-            balanceBefore;
+                    balanceBefore;
 
         return withdrawnAmount;
     }
 
     function updateEpoch() external nonReentrant {
-        _updateEpoch(getFreeBalance(), 0);
+        _updateEpoch(getFreeBalance());
     }
 
     function _restakerExists(address restakerAddress)
-        internal
-        view
-        returns (bool)
+    internal
+    view
+    returns (bool)
     {
         uint256 numOfRestakers = restakers.length;
         for (uint256 i = 0; i < numOfRestakers; ++i) {
@@ -295,12 +324,11 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
         return false;
     }
 
-    function _updateEpoch(uint256 availableBalance, uint256 slashed) internal {
-        pendingSlashed += slashed;
-        uint256 totalAvailable = availableBalance + pendingSlashed;
+    function _updateEpoch(uint256 availableBalance) internal {
+        uint256 totalAvailable = availableBalance;
 
         uint256 withdrawalsNum = claimerSlashedWithdrawalsQueue.length;
-        for (uint256 i = epoch; i < withdrawalsNum; ) {
+        for (uint256 i = epoch; i < withdrawalsNum;) {
             uint256 amount = claimerSlashedWithdrawalsQueue[i].amount;
             unchecked {
                 if (amount > totalAvailable) {
@@ -312,15 +340,10 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
                 ++i;
             }
         }
-
-        pendingSlashed = 0;
-        if (totalAvailable > availableBalance) {
-            pendingSlashed = totalAvailable - availableBalance;
-        }
     }
 
     function forceUndelegateRecovery(uint256 amount, address restaker)
-        external
+    external
     {
         if (restaker == address(0)) revert NullParams();
         for (uint256 i = 0; i < restakers.length; ++i) {
@@ -375,11 +398,7 @@ contract EigenLayerFacet is InceptionVaultStorage_EL {
         emit RewardsAdded(amount, startTimeline);
     }
 
-    function __beforeClaiming(IDelegationManager.Withdrawal[] calldata withdrawals) internal returns (uint256 expected) {
-        for (uint256 i = 0; i < withdrawals.length; i++) {
-            expected += strategy.sharesToUnderlying(withdrawals[i].shares[0]);
-        }
-
-        return expected;
+    function __beforeClaiming(IDelegationManager.Withdrawal calldata withdrawal) internal returns (uint256 expected) {
+        return strategy.sharesToUnderlying(withdrawal.shares[0]);
     }
 }
