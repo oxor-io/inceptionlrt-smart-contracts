@@ -294,42 +294,6 @@ const initVault = async a => {
   await iVaultSetters.setTargetFlashCapacity(1n);
   console.log(`... iVault initialization completed ....`);
 
-  iVault.withdrawFromELAndClaim = async function(nodeOperator, amount) {
-    let tx = await iVaultEL.connect(iVaultOperator).undelegateFrom(nodeOperator, amount);
-    const restaker = nodeOperatorToRestaker.get(nodeOperator);
-    const receipt = await tx.wait();
-    if (receipt.logs.length !== 3) {
-      console.error("WRONG NUMBER OF EVENTS in withdrawFromEigenLayerEthAmount()", receipt.logs.length);
-      console.log(receipt.logs);
-    }
-
-    // Loop through each log in the receipt
-    let WithdrawalQueuedEvent;
-    for (const log of receipt.logs) {
-      try {
-        const event = eigenLayerFacetFactory.interface.parseLog(log);
-        if (event != null) {
-          WithdrawalQueuedEvent = event.args;
-        }
-      } catch (error) {
-        console.error("Error parsing event log:", error);
-      }
-    }
-
-    const withdrawalData = [
-      WithdrawalQueuedEvent["stakerAddress"],
-      nodeOperator,
-      restaker,
-      WithdrawalQueuedEvent["nonce"],
-      WithdrawalQueuedEvent["withdrawalStartBlock"],
-      [WithdrawalQueuedEvent["strategy"]],
-      [WithdrawalQueuedEvent["shares"]],
-    ];
-
-    await mineBlocks(minWithdrawalDelayBlocks);
-    await iVaultEL.connect(iVaultOperator).claimCompletedWithdrawals(restaker, [withdrawalData]);
-  };
-
   iVault.delegateToOperator = async function(nodeOperator, amount) {
     const tx = await iVaultEL.connect(iVaultOperator)
       .delegateToOperator(amount, nodeOperator, ethers.ZeroHash, [ethers.ZeroHash, 0]);
@@ -531,7 +495,7 @@ assets.forEach(function(a) {
         expect(await asset.balanceOf(staker.address)).to.be.closeTo(toWei(5), transactErr);
       });
 
-      it("2 slashed withdrawals", async function() {
+      it("2 slashed withdrawals by 1 undelegate", async function() {
         await snapshot.restore();
 
         // make deposit
